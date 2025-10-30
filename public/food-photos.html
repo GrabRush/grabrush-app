@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabush - Food Photos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Grabush</h1>
+
+        <div class="user-info">
+            <p>Welcome, <span id="userName"></span>!</p>
+            <form action="/logout" method="POST" style="display: inline;">
+                <button type="submit" class="logout-btn">Logout</button>
+            </form>
+        </div>
+
+        <h2>Random Food Photos</h2>
+        <p>Discover delicious food from around the world!</p>
+
+        <div class="food-gallery" id="foodGallery">
+            <div class="loading">Loading delicious food photos...</div>
+        </div>
+
+        <button onclick="loadMoreFood()" class="load-more-btn">Load More Food</button>
+    </div>
+
+    <script>
+        // Get user name from session (this would normally come from the server)
+        document.getElementById('userName').textContent = 'Food Lover';
+
+        // Food photos data (in a real app, this would come from an API)
+        const foodPhotos = [
+            { id: 1, name: 'Pizza Margherita', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop' },
+            { id: 2, name: 'Sushi Platter', url: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd1871?w=400&h=300&fit=crop' },
+            { id: 3, name: 'Burger Deluxe', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop' },
+            { id: 4, name: 'Pasta Carbonara', url: 'https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=400&h=300&fit=crop' },
+            { id: 5, name: 'Tacos', url: 'https://images.unsplash.com/photo-1565299585323-38174c4aab98?w=400&h=300&fit=crop' },
+            { id: 6, name: 'Ramen Bowl', url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=300&fit=crop' },
+            { id: 7, name: 'Caesar Salad', url: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400&h=300&fit=crop' },
+            { id: 8, name: 'Chicken Wings', url: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop' },
+            { id: 9, name: 'Fish and Chips', url: 'https://images.unsplash.com/photo-1544982503-9f984c1454a2?w=400&h=300&fit=crop' },
+            { id: 10, name: 'Ice Cream Sundae', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=300&fit=crop' },
+            { id: 11, name: 'Pad Thai', url: 'https://images.unsplash.com/photo-1559314809-0e1554a4b6c3?w=400&h=300&fit=crop' },
+            { id: 12, name: 'Steak', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=crop' }
+        ];
+
+        let displayedPhotos = [];
+        let currentIndex = 0;
+
+        function getRandomFood() {
+            const availablePhotos = foodPhotos.filter(photo => !displayedPhotos.includes(photo.id));
+            if (availablePhotos.length === 0) {
+                displayedPhotos = [];
+                return foodPhotos[Math.floor(Math.random() * foodPhotos.length)];
+            }
+            return availablePhotos[Math.floor(Math.random() * availablePhotos.length)];
+        }
+
+        function displayFood(photo) {
+            const gallery = document.getElementById('foodGallery');
+            const foodCard = document.createElement('div');
+            foodCard.className = 'food-card';
+            foodCard.innerHTML = `
+                <img src="${photo.url}" alt="${photo.name}" loading="lazy">
+                <h3>${photo.name}</h3>
+            `;
+            gallery.appendChild(foodCard);
+            displayedPhotos.push(photo.id);
+        }
+
+        function loadMoreFood() {
+            const gallery = document.getElementById('foodGallery');
+            if (gallery.querySelector('.loading')) {
+                gallery.innerHTML = '';
+            }
+
+            // Load 6 random food photos
+            for (let i = 0; i < 6; i++) {
+                const randomFood = getRandomFood();
+                displayFood(randomFood);
+            }
+        }
+
+        // Load initial food photos
+        window.onload = function() {
+            loadMoreFood();
+        };
+    </script>
+</body>
+</html>
+
+
+

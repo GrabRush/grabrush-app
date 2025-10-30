@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add User</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Add New User</h1>
+
+        <div id="message"></div>
+
+        <form action="/add-user" method="POST">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <button type="submit">Add User</button>
+        </form>
+
+        <div class="users-section">
+            <h2>Users in Database</h2>
+            <button onclick="loadUsers()">Refresh Users</button>
+            <div id="usersList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Show success/error messages
+        const urlParams = new URLSearchParams(window.location.search);
+        const success = urlParams.get('success');
+        const error = urlParams.get('error');
+
+        const messageDiv = document.getElementById('message');
+
+        if (success) {
+            messageDiv.innerHTML = '<div class="success">' + success + '</div>';
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        if (error) {
+            messageDiv.innerHTML = '<div class="error">' + error + '</div>';
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        // Load users on page load
+        window.onload = function() {
+            loadUsers();
+        };
+
+        // Load users from database
+        async function loadUsers() {
+            try {
+                const response = await fetch('/users');
+                const data = await response.json();
+
+                const usersList = document.getElementById('usersList');
+
+                if (data.success && data.data.length > 0) {
+                    usersList.innerHTML = data.data.map(user =>
+                        `<div class="user-item">
+                            <strong>${user.name}</strong> - ${user.email}
+                            <small>(Added: ${new Date(user.created_at).toLocaleDateString()})</small>
+                        </div>`
+                    ).join('');
+                } else {
+                    usersList.innerHTML = '<p>No users found in database.</p>';
+                }
+            } catch (error) {
+                document.getElementById('usersList').innerHTML = '<p>Error loading users.</p>';
+            }
+        }
+    </script>
+</body>
+</html>

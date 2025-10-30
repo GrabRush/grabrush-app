@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabush - Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Grabush</h1>
+
+        <div id="message"></div>
+
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <button type="submit">Login</button>
+        </form>
+
+        <div class="register-link">
+            <p>Not a member yet?</p>
+            <a href="/verify-email">Register</a>
+        </div>
+    </div>
+
+    <script>
+        // Show success/error messages
+        const urlParams = new URLSearchParams(window.location.search);
+        const success = urlParams.get('success');
+        const error = urlParams.get('error');
+
+        const messageDiv = document.getElementById('message');
+
+        if (success) {
+            messageDiv.innerHTML = '<div class="success">' + success + '</div>';
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        if (error) {
+            messageDiv.innerHTML = '<div class="error">' + error + '</div>';
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    </script>
+</body>
+</html>
