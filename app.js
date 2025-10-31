@@ -73,20 +73,26 @@ app.post('/send-verification', async (req, res) => {
       return res.status(400).send('Email is required');
     }
 
-    // Check if email already exists
-    const checkQuery = 'SELECT id FROM users WHERE email = ?';
-    const checkResult = await executeQuery(checkQuery, [email]);
+    // Check if email already exists in users or vendors
+    const checkUsersQuery = 'SELECT id FROM users WHERE email = ?';
+    const checkVendorsQuery = 'SELECT id FROM vendors WHERE email = ?';
+    const checkUsersResult = await executeQuery(checkUsersQuery, [email]);
+    const checkVendorsResult = await executeQuery(checkVendorsQuery, [email]);
     
-    if (checkResult.success && checkResult.data.length > 0) {
+    if ((checkUsersResult.success && checkUsersResult.data.length > 0) || 
+        (checkVendorsResult.success && checkVendorsResult.data.length > 0)) {
       return res.status(400).send('Email already registered');
     }
 
     // Generate verification token
     const token = crypto.randomBytes(32).toString('hex');
     
-    // Store token in database (create a temporary record)
-    const insertTokenQuery = 'INSERT INTO users (email, verification_token, is_verified) VALUES (?, ?, FALSE) ON DUPLICATE KEY UPDATE verification_token = ?';
-    await executeQuery(insertTokenQuery, [email, token, token]);
+    // Store token in database (create a temporary record in both tables for flexibility)
+    // The actual registration will determine which table to use
+    const insertUsersTokenQuery = 'INSERT INTO users (email, verification_token, is_verified) VALUES (?, ?, FALSE) ON DUPLICATE KEY UPDATE verification_token = ?';
+    const insertVendorsTokenQuery = 'INSERT INTO vendors (email, verification_token, is_verified) VALUES (?, ?, FALSE) ON DUPLICATE KEY UPDATE verification_token = ?';
+    await executeQuery(insertUsersTokenQuery, [email, token, token]);
+    await executeQuery(insertVendorsTokenQuery, [email, token, token]);
 
     // Send verification email
     const baseUrl = process.env.NODE_ENV === 'production' ? 'https://grabrush.shop' : `http://localhost:${PORT}`;
@@ -122,38 +128,88 @@ app.post('/send-verification', async (req, res) => {
 // Handle user registration
 app.post('/register', async (req, res) => {
   try {
-    const { name, email, password, street, city, zip, phone, token } = req.body;
+    const { userType, email, password, token, name, street, city, zip, phone, businessName, location, businessContact } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).send('Name, email, and password are required');
-    }
-
-    // Verify token
-    const tokenQuery = 'SELECT id FROM users WHERE email = ? AND verification_token = ?';
-    const tokenResult = await executeQuery(tokenQuery, [email, token]);
-    
-    if (!tokenResult.success || tokenResult.data.length === 0) {
-      return res.status(400).send('Invalid or expired verification token');
+    // Validate token first
+    if (!token || !email) {
+      return res.status(400).send('Token and email are required');
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Update user with registration details
-    const updateQuery = `
-      UPDATE users 
-      SET name = ?, password = ?, street = ?, city = ?, zip = ?, phone = ?, is_verified = TRUE, verification_token = NULL 
-      WHERE email = ? AND verification_token = ?
-    `;
-    
-    const result = await executeQuery(updateQuery, [
-      name, hashedPassword, street || null, city || null, zip || null, phone || null, email, token
-    ]);
+    if (userType === 'vendor') {
+      // Vendor registration
+      if (!businessName || !password || !location || !businessContact) {
+        return res.status(400).send('Business Name, Password, Location, and Business Contact No. are required');
+      }
 
-    if (result.success) {
-      res.redirect('/?success=Registration successful! Please login.');
+      // Check if email exists in vendors table with matching token
+      const checkVendorQuery = 'SELECT id FROM vendors WHERE email = ? AND verification_token = ?';
+      const vendorTokenResult = await executeQuery(checkVendorQuery, [email, token]);
+      
+      if (!vendorTokenResult.success || vendorTokenResult.data.length === 0) {
+        // Check if vendor email exists at all
+        const checkVendorEmailQuery = 'SELECT id FROM vendors WHERE email = ?';
+        const vendorEmailResult = await executeQuery(checkVendorEmailQuery, [email]);
+        
+        if (vendorEmailResult.success && vendorEmailResult.data.length > 0) {
+          // Update existing vendor record with token
+          const updateTokenQuery = 'UPDATE vendors SET verification_token = ? WHERE email = ?';
+          await executeQuery(updateTokenQuery, [token, email]);
+        } else {
+          // Create new vendor entry with token
+          const createVendorQuery = 'INSERT INTO vendors (email, verification_token, is_verified) VALUES (?, ?, FALSE)';
+          await executeQuery(createVendorQuery, [email, token]);
+        }
+      }
+
+      // Update vendor with registration details
+      const updateVendorQuery = `
+        UPDATE vendors 
+        SET business_name = ?, password = ?, location = ?, business_contact = ?, is_verified = TRUE, verification_token = NULL 
+        WHERE email = ? AND verification_token = ?
+      `;
+      
+      const vendorResult = await executeQuery(updateVendorQuery, [
+        businessName, hashedPassword, location, businessContact, email, token
+      ]);
+
+      if (vendorResult.success) {
+        res.redirect('/?success=Registration successful! Please login.');
+      } else {
+        res.redirect('/register?error=' + encodeURIComponent('Vendor registration failed'));
+      }
     } else {
-      res.redirect('/register?error=' + encodeURIComponent('Registration failed'));
+      // Customer registration
+      if (!name || !email || !password) {
+        return res.status(400).send('Name, email, and password are required');
+      }
+
+      // Verify token
+      const tokenQuery = 'SELECT id FROM users WHERE email = ? AND verification_token = ?';
+      const tokenResult = await executeQuery(tokenQuery, [email, token]);
+      
+      if (!tokenResult.success || tokenResult.data.length === 0) {
+        return res.status(400).send('Invalid or expired verification token');
+      }
+
+      // Update user with registration details
+      const updateQuery = `
+        UPDATE users 
+        SET name = ?, password = ?, street = ?, city = ?, zip = ?, phone = ?, is_verified = TRUE, verification_token = NULL 
+        WHERE email = ? AND verification_token = ?
+      `;
+      
+      const result = await executeQuery(updateQuery, [
+        name, hashedPassword, street || null, city || null, zip || null, phone || null, email, token
+      ]);
+
+      if (result.success) {
+        res.redirect('/?success=Registration successful! Please login.');
+      } else {
+        res.redirect('/register?error=' + encodeURIComponent('Registration failed'));
+      }
     }
   } catch (error) {
     console.error('Registration error:', error);
@@ -170,15 +226,29 @@ app.post('/login', async (req, res) => {
       return res.status(400).send('Email and password are required');
     }
 
-    // Get user from database
+    // Check users table first
     const userQuery = 'SELECT * FROM users WHERE email = ? AND (is_verified = TRUE OR is_verified IS NULL)';
-    const result = await executeQuery(userQuery, [email]);
+    const userResult = await executeQuery(userQuery, [email]);
 
-    if (!result.success || result.data.length === 0) {
-      return res.redirect('/?error=' + encodeURIComponent('Invalid email or password'));
+    let user = null;
+    let userType = 'customer';
+
+    if (userResult.success && userResult.data.length > 0) {
+      user = userResult.data[0];
+    } else {
+      // Check vendors table if not found in users
+      const vendorQuery = 'SELECT * FROM vendors WHERE email = ? AND (is_verified = TRUE OR is_verified IS NULL)';
+      const vendorResult = await executeQuery(vendorQuery, [email]);
+      
+      if (vendorResult.success && vendorResult.data.length > 0) {
+        user = vendorResult.data[0];
+        userType = 'vendor';
+      }
     }
 
-    const user = result.data[0];
+    if (!user) {
+      return res.redirect('/?error=' + encodeURIComponent('Invalid email or password'));
+    }
 
     // Check password
     if (!user.password) {
@@ -194,7 +264,14 @@ app.post('/login', async (req, res) => {
     // Set session
     req.session.userId = user.id;
     req.session.userEmail = user.email;
-    req.session.userName = user.name;
+    req.session.userType = userType;
+    
+    // Set name based on user type
+    if (userType === 'vendor') {
+      req.session.userName = user.business_name;
+    } else {
+      req.session.userName = user.name;
+    }
 
     res.redirect('/welcome');
   } catch (error) {
@@ -230,15 +307,39 @@ app.get('/welcome', (req, res) => {
   }
   const fullName = req.session.userName || 'Food lover';
   const firstName = String(fullName).split(' ')[0] || 'Food lover';
-  const images = [
-    'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=1200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1543339308-43f6c2d88c36?q=80&w=1200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop'
-  ];
-  const grid = images.map(src => `<img src="${src}" alt="Food" loading="lazy">`).join('');
+  const userType = req.session.userType || 'customer';
+  
+  let grid = '';
+  
+  if (userType === 'vendor') {
+    // Restaurant photos with names for vendors
+    const restaurants = [
+      { name: 'Bella Vista Restaurant', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop' },
+      { name: 'The Gourmet Kitchen', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1200&auto=format&fit=crop' },
+      { name: 'Seaside Bistro', image: 'https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?q=80&w=1200&auto=format&fit=crop' },
+      { name: 'Mountain View Cafe', image: 'https://images.unsplash.com/photo-1515669097368-22e68427d265?q=80&w=1200&auto=format&fit=crop' },
+      { name: 'Downtown Diner', image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1200&auto=format&fit=crop' },
+      { name: 'The Rustic Table', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop' }
+    ];
+    grid = restaurants.map(restaurant => `
+      <div class="restaurant-item">
+        <img src="${restaurant.image}" alt="${restaurant.name}" loading="lazy">
+        <div class="restaurant-name">${restaurant.name}</div>
+      </div>
+    `).join('');
+  } else {
+    // Food photos for customers
+    const images = [
+      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1543339308-43f6c2d88c36?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop'
+    ];
+    grid = images.map(src => `<img src="${src}" alt="Food" loading="lazy">`).join('');
+  }
+  
   const html = `<!DOCTYPE html>
   <html lang="en">
   <head>
@@ -318,6 +419,50 @@ app.listen(PORT, async () => {
             console.log('Column already exists, skipping...');
           } else {
             console.log('Error adding column:', error.message);
+          }
+        }
+      }
+    }
+
+    // Create vendors table if it doesn't exist
+    const createVendorsTableQuery = `
+      CREATE TABLE IF NOT EXISTS vendors (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        business_name VARCHAR(200),
+        email VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(255),
+        location VARCHAR(200),
+        business_contact VARCHAR(20),
+        is_verified BOOLEAN DEFAULT FALSE,
+        verification_token VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    const createVendorsResult = await executeQuery(createVendorsTableQuery);
+    if (createVendorsResult.success) {
+      console.log('✅ Vendors table ready');
+      
+      // Ensure columns allow NULLs for pre-verification records and exist if missing
+      const vendorAlterQueries = [
+        'ALTER TABLE vendors MODIFY COLUMN business_name VARCHAR(200) NULL',
+        'ALTER TABLE vendors MODIFY COLUMN password VARCHAR(255) NULL',
+        'ALTER TABLE vendors MODIFY COLUMN location VARCHAR(200) NULL',
+        'ALTER TABLE vendors MODIFY COLUMN business_contact VARCHAR(20) NULL',
+        'ALTER TABLE vendors ADD COLUMN is_verified BOOLEAN DEFAULT FALSE',
+        'ALTER TABLE vendors ADD COLUMN verification_token VARCHAR(255)'
+      ];
+      
+      for (const alterQuery of vendorAlterQueries) {
+        try {
+          await executeQuery(alterQuery);
+          console.log('✅ Vendor column added successfully');
+        } catch (error) {
+          // Column might already exist or already modified; ignore specific errors
+          if (error.message.includes('Duplicate column name') || error.message.includes('check that column/key exists')) {
+            console.log('Vendor column already exists, skipping...');
+          } else {
+            console.log('Error adding vendor column:', error.message);
           }
         }
       }

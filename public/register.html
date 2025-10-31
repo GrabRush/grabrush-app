@@ -14,9 +14,17 @@
 
         <h2>Complete Your Registration</h2>
 
-        <form action="/register" method="POST">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button type="button" class="tab-button active" id="customerTab" onclick="switchTab('customer')">Customer</button>
+            <button type="button" class="tab-button" id="vendorTab" onclick="switchTab('vendor')">Vendor</button>
+        </div>
+
+        <!-- Customer Form -->
+        <form action="/register" method="POST" id="customerForm">
             <input type="hidden" id="token" name="token">
             <input type="hidden" id="email" name="email">
+            <input type="hidden" name="userType" value="customer">
 
             <div class="form-group">
                 <label for="name">Name:</label>
@@ -55,6 +63,39 @@
             <button type="submit">Complete Registration</button>
         </form>
 
+        <!-- Vendor Form -->
+        <form action="/register" method="POST" id="vendorForm" style="display: none;">
+            <input type="hidden" id="vendorToken" name="token">
+            <input type="hidden" id="vendorEmail" name="email">
+            <input type="hidden" name="userType" value="vendor">
+
+            <div class="form-group">
+                <label for="businessName">Business Name:</label>
+                <input type="text" id="businessName" name="businessName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="vendorPassword">Password:</label>
+                <input type="password" id="vendorPassword" name="password" required>
+                <label style="font-size: 14px; font-weight: normal; margin-top: 5px; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="showVendorPassword" style="width: auto; margin: 0;">
+                    Show password
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="location">Location:</label>
+                <input type="text" id="location" name="location" required>
+            </div>
+
+            <div class="form-group">
+                <label for="businessContact">Business Contact No.:</label>
+                <input type="tel" id="businessContact" name="businessContact" required>
+            </div>
+
+            <button type="submit">Complete Registration</button>
+        </form>
+
         <div class="login-link">
             <p>Already have an account?</p>
             <a href="/">Login</a>
@@ -71,10 +112,12 @@
             window.location.href = '/verify-email';
         }
 
-        // Set hidden fields
+        // Set hidden fields for customer form
         document.getElementById('token').value = token;
+        document.getElementById('vendorToken').value = token;
         if (email) {
             document.getElementById('email').value = email;
+            document.getElementById('vendorEmail').value = email;
         }
 
         // Show error messages
@@ -87,10 +130,41 @@
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // Password visibility toggle - Register
+        // Tab switching function
+        function switchTab(type) {
+            const customerTab = document.getElementById('customerTab');
+            const vendorTab = document.getElementById('vendorTab');
+            const customerForm = document.getElementById('customerForm');
+            const vendorForm = document.getElementById('vendorForm');
+
+            if (type === 'customer') {
+                customerTab.classList.add('active');
+                vendorTab.classList.remove('active');
+                customerForm.style.display = 'block';
+                vendorForm.style.display = 'none';
+            } else {
+                vendorTab.classList.add('active');
+                customerTab.classList.remove('active');
+                vendorForm.style.display = 'block';
+                customerForm.style.display = 'none';
+            }
+        }
+
+        // Password visibility toggle - Customer
         (function(){
             const pwdInput = document.getElementById('password');
             const checkbox = document.getElementById('showPasswordRegister');
+            if (pwdInput && checkbox) {
+                checkbox.addEventListener('change', function(){
+                    pwdInput.type = this.checked ? 'text' : 'password';
+                });
+            }
+        })();
+
+        // Password visibility toggle - Vendor
+        (function(){
+            const pwdInput = document.getElementById('vendorPassword');
+            const checkbox = document.getElementById('showVendorPassword');
             if (pwdInput && checkbox) {
                 checkbox.addEventListener('change', function(){
                     pwdInput.type = this.checked ? 'text' : 'password';
