@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vendor Dashboard - Grabrush</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .dashboard-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    .metrics { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+    .metric-card { flex: 1 1 200px; background:#fff; border-radius:8px; padding:16px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+    .metric-value { font-size:32px; font-weight:700; margin-top:4px; }
+    .actions { display:flex; gap:12px; margin-bottom:24px; }
+    .actions a { background:#4CAF50; color:#fff; padding:12px 18px; border-radius:6px; text-decoration:none; font-weight:600; }
+    .actions a.secondary { background:#1976d2; }
+    .section-title { font-size:20px; margin:28px 0 12px; font-weight:600; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px 8px; text-align:left; border-bottom:1px solid #eee; }
+    th { background:#fafafa; font-weight:600; }
+    .status-pill { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .status-in_progress { background:#ffe082; }
+    .status-ready { background:#81c784; color:#1b5e20; }
+    .status-completed { background:#90a4ae; color:#263238; }
+    .product-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+    .product-card { background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:12px; display:flex; flex-direction:column; }
+    .product-card img { width:100%; height:140px; object-fit:cover; border-radius:6px; }
+    .product-name { font-weight:600; margin:8px 0 4px; }
+    .product-meta { font-size:12px; color:#555; }
+    .logout-form { margin-left:auto; }
+    .top-bar { display:flex; align-items:center; gap:16px; margin-bottom:24px; }
+    .refresh-btn { background:#555; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; }
+    .inline-btn { background:#1976d2; color:#fff; border:none; padding:6px 10px; border-radius:4px; font-size:12px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="top-bar">
+      <h1 style="margin:0; font-size:28px;">Vendor Dashboard</h1>
+      <button class="refresh-btn" id="refreshAll">Refresh</button>
+      <form action="/logout" method="POST" class="logout-form"><button type="submit" class="logout-button" style="padding:8px 16px;">Logout</button></form>
+    </div>
+
+    <div class="metrics" id="metrics">
+      <div class="metric-card"><div>Today's Orders</div><div class="metric-value" id="metric-today">0</div></div>
+      <div class="metric-card"><div>Ready for Pickup</div><div class="metric-value" id="metric-ready">0</div></div>
+      <div class="metric-card"><div>Completed</div><div class="metric-value" id="metric-completed">0</div></div>
+    </div>
+
+    <div class="actions">
+      <a href="/vendor/products/new">Add New Product</a>
+      <a href="/vendor/mystery-boxes/new" class="secondary">Setup a Mystery Box</a>
+    </div>
+
+    <div class="section-title">Recent Orders</div>
+    <div style="overflow-x:auto;">
+      <table id="orders-table">
+        <thead><tr><th>ID</th><th>Item</th><th>Type</th><th>Price</th><th>Pickup Window</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="section-title">Products</div>
+    <div class="product-list" id="product-list"></div>
+
+    <div class="section-title">Mystery Boxes</div>
+    <div class="product-list" id="box-list"></div>
+  </div>
+
+  <script>
+    async function fetchJSON(url, options={}) { const res = await fetch(url, options); if(!res.ok){ throw new Error('Request failed: '+res.status); } return res.json(); }
+    function formatDateTime(dt){ if(!dt) return ''; const d=new Date(dt); return d.toLocaleString(); }
+
+    async function loadMetrics(){
+      try { const data = await fetchJSON('/vendor/dashboard/metrics'); if(data.success){
+        document.getElementById('metric-today').textContent = data.data.todaysOrders;
+        document.getElementById('metric-ready').textContent = data.data.readyOrders;
+        document.getElementById('metric-completed').textContent = data.data.completedOrders;
+      }} catch(e){ console.error(e); }
+    }
+
+    async function loadOrders(){
+      try { const data = await fetchJSON('/vendor/orders?limit=20'); const tbody = document.querySelector('#orders-table tbody'); tbody.innerHTML='';
+        if(data.success){ data.data.forEach(o => {
+          const tr=document.createElement('tr');
+          const pickup = o.pickup_start_time ? (formatDateTime(o.pickup_start_time)+' - '+formatDateTime(o.pickup_end_time)) : '';
+          tr.innerHTML = `<td>${o.id}</td><td>${o.item_title || ''}</td><td>${o.order_type}</td><td>$${Number(o.price).toFixed(2)}</td><td>${pickup}</td><td><span class="status-pill status-${o.status}">${o.status.replace('_',' ')}</span></td><td><button class='inline-btn' data-id='${o.id}' data-status='ready'>Mark Ready</button> <button class='inline-btn' data-id='${o.id}' data-status='completed'>Complete</button></td>`;
+          tbody.appendChild(tr);
+        }); }
+      } catch(e){ console.error(e); }
+    }
+
+    async function loadProducts(){
+      try { const data = await fetchJSON('/vendor/products'); const list = document.getElementById('product-list'); list.innerHTML='';
+        if(data.success){ data.data.forEach(p => {
+          const div=document.createElement('div'); div.className='product-card';
+          div.innerHTML = `<img src='${p.image_url || 'https://via.placeholder.com/300x180?text=No+Image'}' alt='${p.name}'/><div class='product-name'>${p.name}</div><div class='product-meta'>Qty: ${p.quantity} | $${Number(p.price).toFixed(2)}${p.discount? ' (-'+p.discount+')':''}</div>`;
+          list.appendChild(div);
+        }); }
+      } catch(e){ console.error(e); }
+    }
+
+    async function loadBoxes(){
+      try { const data = await fetchJSON('/vendor/mystery-boxes'); const list = document.getElementById('box-list'); list.innerHTML='';
+        if(data.success){ data.data.forEach(b => {
+          const div=document.createElement('div'); div.className='product-card';
+          div.innerHTML = `<div style='height:140px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;border-radius:6px;font-weight:600;'>Mystery Box</div><div class='product-name'>${b.title || 'Untitled Box'}</div><div class='product-meta'>Items: ${b.item_count} | Qty: ${b.quantity} | $${Number(b.price).toFixed(2)}</div>`;
+          list.appendChild(div);
+        }); }
+      } catch(e){ console.error(e); }
+    }
+
+    document.getElementById('refreshAll').addEventListener('click', () => {
+      loadMetrics(); loadOrders(); loadProducts(); loadBoxes();
+    });
+
+    document.querySelector('#orders-table').addEventListener('click', async (e) => {
+      if(e.target.matches('button.inline-btn')){
+        const id=e.target.getAttribute('data-id'); const status=e.target.getAttribute('data-status');
+        try { const res = await fetch(`/vendor/orders/${id}/status`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status })}); const j=await res.json(); if(j.success){ loadOrders(); loadMetrics(); } } catch(err){ console.error(err); }
+      }
+    });
+
+    // Initial load
+    loadMetrics(); loadOrders(); loadProducts(); loadBoxes();
+  </script>
+</body>
+</html>

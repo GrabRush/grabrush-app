@@ -4,8 +4,31 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { body, validationResult } = require('express-validator');
 require('dotenv').config();
 const { testConnection, executeQuery, closeConnection } = require('./database');
+const rateLimit = require('express-rate-limit');
+const winston = require('winston');
+
+// Logger setup
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.printf(({ level, message, timestamp, stack }) => {
+          return `[${timestamp}] ${level}: ${stack || message}`;
+        })
+      )
+    })
+  ]
+});
 
 const app = express();
 const PORT = process.env.PORT || 9000;
@@ -20,8 +43,24 @@ app.use(session({
   secret: 'grabush-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 }
 }));
+
+// Rate limiters
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, error: 'Too many login attempts. Please try again later.' }
+});
+const vendorApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { success: false, error: 'Rate limit exceeded. Slow down.' }
+});
+
+// Apply specific limiters
+app.use('/login', loginLimiter);
+app.use('/vendor', vendorApiLimiter);
 
 // Email configuration function (using Gmail as example)
 const createTransporter = () => {
@@ -273,6 +312,10 @@ app.post('/login', async (req, res) => {
       req.session.userName = user.name;
     }
 
+    // Redirect vendor to vendor dashboard
+    if (userType === 'vendor') {
+      return res.redirect('/vendor/dashboard');
+    }
     res.redirect('/welcome');
   } catch (error) {
     console.error('Login error:', error);
@@ -288,6 +331,337 @@ app.post('/logout', (req, res) => {
     }
     res.redirect('/');
   });
+});
+
+// Vendor auth middleware
+function requireVendor(req, res, next) {
+  if (!req.session.userId || req.session.userType !== 'vendor') {
+    return res.status(403).json({ success: false, error: 'Vendor authentication required' });
+  }
+  next();
+}
+
+// Serve vendor dashboard pages
+app.get('/vendor/dashboard', (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'vendor') {
+    return res.redirect('/');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'vendor-dashboard.html'));
+});
+
+app.get('/vendor/products/new', (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'vendor') {
+    return res.redirect('/');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'vendor-product-new.html'));
+});
+
+app.get('/vendor/mystery-boxes/new', (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'vendor') {
+    return res.redirect('/');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'vendor-mystery-box-new.html'));
+});
+
+// Placeholder: Product & Mystery Box management APIs will be added below
+// Endpoints to implement:
+// POST /vendor/products
+// GET /vendor/products
+// POST /vendor/mystery-boxes
+// GET /vendor/mystery-boxes
+// GET /vendor/dashboard/metrics
+// GET /vendor/orders
+// PUT /vendor/orders/:id/status
+
+// Create a new product
+app.post('/vendor/products',
+  requireVendor,
+  [
+    body('name').isString().trim().isLength({ min: 2 }).withMessage('Name min length 2'),
+    body('price').isFloat({ gt: 0 }).withMessage('Price must be > 0'),
+    body('quantity').optional().isInt({ min: 0 }).withMessage('Quantity must be >= 0'),
+    body('discount').optional().isFloat({ min: 0 }).withMessage('Discount must be >= 0'),
+    body('is_premium').optional().isBoolean().withMessage('is_premium must be boolean'),
+    body('pickup_start_time').optional().isISO8601().withMessage('pickup_start_time must be ISO8601'),
+    body('pickup_end_time').optional().isISO8601().withMessage('pickup_end_time must be ISO8601')
+  ],
+  async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const {
+      image_url,
+      name,
+      description,
+      category,
+      quantity,
+      price,
+      discount,
+      is_premium,
+      pickup_start_time,
+      pickup_end_time,
+      enable_today
+    } = req.body;
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: 'Validation failed', details: errors.array() });
+    }
+
+    const insertQuery = `
+      INSERT INTO products (
+        vendor_id, image_url, name, description, category, quantity, price, discount, is_premium, 
+        pickup_start_time, pickup_end_time, enable_today
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const params = [
+      vendorId,
+      image_url || null,
+      name,
+      description || null,
+      category || null,
+      quantity != null ? quantity : 0,
+      price,
+      discount != null ? discount : 0,
+      is_premium ? 1 : 0,
+      pickup_start_time || null,
+      pickup_end_time || null,
+      enable_today ? 1 : 0
+    ];
+
+    const result = await executeQuery(insertQuery, params);
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+
+    // Fetch the created product
+    const productIdQuery = 'SELECT * FROM products WHERE id = LAST_INSERT_ID()';
+    const productResult = await executeQuery(productIdQuery);
+    return res.status(201).json({ success: true, data: productResult.data[0] });
+  } catch (error) {
+    console.error('Create product error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create product' });
+  }
+});
+
+// List products for vendor
+app.get('/vendor/products', requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const listQuery = 'SELECT * FROM products WHERE vendor_id = ? ORDER BY created_at DESC';
+    const result = await executeQuery(listQuery, [vendorId]);
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+    res.json({ success: true, data: result.data });
+  } catch (error) {
+    console.error('List products error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list products' });
+  }
+});
+
+// Create a new mystery box
+app.post('/vendor/mystery-boxes',
+  requireVendor,
+  [
+    body('product_ids').isArray({ min: 1 }).withMessage('product_ids must be non-empty array'),
+    body('price').isFloat({ gt: 0 }).withMessage('Price must be > 0'),
+    body('quantity').optional().isInt({ min: 0 }).withMessage('Quantity must be >= 0'),
+    body('pickup_start_time').optional().isISO8601().withMessage('pickup_start_time must be ISO8601'),
+    body('pickup_end_time').optional().isISO8601().withMessage('pickup_end_time must be ISO8601')
+  ],
+  async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const { title, product_ids, price, quantity, pickup_start_time, pickup_end_time } = req.body;
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: 'Validation failed', details: errors.array() });
+    }
+
+    const insertMysteryBoxQuery = `
+      INSERT INTO mystery_boxes (vendor_id, title, price, quantity, pickup_start_time, pickup_end_time)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    const mysteryBoxParams = [
+      vendorId,
+      title || null,
+      price,
+      quantity != null ? quantity : 0,
+      pickup_start_time || null,
+      pickup_end_time || null
+    ];
+    // Use manual transaction for atomic creation with batch insert
+    const pool = require('./database').pool; // promise pool
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [boxInsert] = await connection.execute(insertMysteryBoxQuery, mysteryBoxParams);
+      const boxId = boxInsert.insertId;
+      if (!boxId) {
+        throw new Error('Failed to insert mystery box');
+      }
+
+      // Build batch insert values
+      const items = product_ids.map(p => [boxId, p.id || p, p.quantity != null ? p.quantity : 1]);
+      const itemInsertQuery = 'INSERT INTO mystery_box_items (mystery_box_id, product_id, quantity) VALUES ?';
+      // mysql2 doesn't support VALUES ? for bulk unless using query with format
+      // Prepare multi-row insert statement manually
+      const placeholders = items.map(() => '(?,?,?)').join(',');
+      const flatValues = items.flat();
+      const bulkQuery = `INSERT INTO mystery_box_items (mystery_box_id, product_id, quantity) VALUES ${placeholders}`;
+      await connection.execute(bulkQuery, flatValues);
+
+      // Fetch complete mystery box with items
+      const fetchQuery = `
+        SELECT mb.*, GROUP_CONCAT(p.name) AS product_names
+        FROM mystery_boxes mb
+        LEFT JOIN mystery_box_items mbi ON mb.id = mbi.mystery_box_id
+        LEFT JOIN products p ON mbi.product_id = p.id
+        WHERE mb.id = ?
+        GROUP BY mb.id
+      `;
+      const [rows] = await connection.execute(fetchQuery, [boxId]);
+
+      await connection.commit();
+      res.status(201).json({ success: true, data: rows[0] });
+    } catch (txErr) {
+      await connection.rollback();
+      console.error('Transaction error creating mystery box:', txErr.message);
+      res.status(500).json({ success: false, error: 'Failed to create mystery box' });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Create mystery box error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create mystery box' });
+  }
+});
+
+// List mystery boxes
+app.get('/vendor/mystery-boxes', requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const listQuery = `
+      SELECT mb.*, COUNT(mbi.id) AS item_count
+      FROM mystery_boxes mb
+      LEFT JOIN mystery_box_items mbi ON mb.id = mbi.mystery_box_id
+      WHERE mb.vendor_id = ?
+      GROUP BY mb.id
+      ORDER BY mb.created_at DESC
+    `;
+    const result = await executeQuery(listQuery, [vendorId]);
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+    res.json({ success: true, data: result.data });
+  } catch (error) {
+    console.error('List mystery boxes error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list mystery boxes' });
+  }
+});
+
+// Dashboard metrics for vendor
+app.get('/vendor/dashboard/metrics', requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const todayOrdersQuery = `SELECT COUNT(*) AS count FROM orders WHERE vendor_id = ? AND DATE(created_at) = CURDATE()`;
+    const readyOrdersQuery = `SELECT COUNT(*) AS count FROM orders WHERE vendor_id = ? AND status = 'ready'`;
+    const completedOrdersQuery = `SELECT COUNT(*) AS count FROM orders WHERE vendor_id = ? AND status = 'completed'`;
+
+    const [today, ready, completed] = await Promise.all([
+      executeQuery(todayOrdersQuery, [vendorId]),
+      executeQuery(readyOrdersQuery, [vendorId]),
+      executeQuery(completedOrdersQuery, [vendorId])
+    ]);
+
+    if (!today.success || !ready.success || !completed.success) {
+      return res.status(500).json({ success: false, error: 'Failed to compute metrics' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        todaysOrders: today.data[0].count,
+        readyOrders: ready.data[0].count,
+        completedOrders: completed.data[0].count
+      }
+    });
+  } catch (error) {
+    console.error('Dashboard metrics error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load metrics' });
+  }
+});
+
+// Recent orders for vendor
+app.get('/vendor/orders', requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const ordersQuery = `
+      SELECT o.id, o.price, o.description, o.pickup_start_time, o.pickup_end_time, o.status, o.order_type,
+             o.created_at,
+             CASE 
+               WHEN o.order_type = 'mystery_box' THEN mb.title
+               ELSE p.name
+             END AS item_title,
+             CASE 
+               WHEN o.order_type = 'mystery_box' THEN (
+                 SELECT GROUP_CONCAT(DISTINCT prod.name SEPARATOR ', ')
+                 FROM mystery_box_items mbi2
+                 JOIN products prod ON prod.id = mbi2.product_id
+                 WHERE mbi2.mystery_box_id = o.mystery_box_id
+               )
+               ELSE NULL
+             END AS mystery_box_product_names
+      FROM orders o
+      LEFT JOIN mystery_boxes mb ON o.mystery_box_id = mb.id
+      LEFT JOIN products p ON o.product_id = p.id
+      WHERE o.vendor_id = ?
+      ORDER BY o.created_at DESC
+      LIMIT ?
+    `;
+    const result = await executeQuery(ordersQuery, [vendorId, limit]);
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+    res.json({ success: true, data: result.data });
+  } catch (error) {
+    console.error('List orders error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list orders' });
+  }
+});
+
+// Update order status
+app.put('/vendor/orders/:id/status', requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.session.userId;
+    const orderId = req.params.id;
+    const { status } = req.body;
+    const allowed = ['in_progress', 'ready', 'completed'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status value' });
+    }
+
+    // Verify order belongs to vendor
+    const verifyQuery = 'SELECT id FROM orders WHERE id = ? AND vendor_id = ?';
+    const verifyResult = await executeQuery(verifyQuery, [orderId, vendorId]);
+    if (!verifyResult.success || verifyResult.data.length === 0) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    const updateQuery = 'UPDATE orders SET status = ? WHERE id = ?';
+    const updateResult = await executeQuery(updateQuery, [status, orderId]);
+    if (!updateResult.success) {
+      return res.status(500).json({ success: false, error: updateResult.error });
+    }
+    res.json({ success: true, data: { id: orderId, status } });
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update order status' });
+  }
 });
 
 // Get all users endpoint (for admin purposes)
@@ -412,13 +786,13 @@ app.listen(PORT, async () => {
       for (const alterQuery of alterQueries) {
         try {
           await executeQuery(alterQuery);
-          console.log('✅ Column added successfully');
+          logger.info('Column ensured/added');
         } catch (error) {
           // Column might already exist or already modified; ignore specific errors
           if (error.message.includes('Duplicate column name') || error.message.includes('check that column/key exists')) {
-            console.log('Column already exists, skipping...');
+            logger.info('Column already exists, skipping');
           } else {
-            console.log('Error adding column:', error.message);
+            logger.error('Error adding user column', error);
           }
         }
       }
@@ -456,17 +830,99 @@ app.listen(PORT, async () => {
       for (const alterQuery of vendorAlterQueries) {
         try {
           await executeQuery(alterQuery);
-          console.log('✅ Vendor column added successfully');
+          logger.info('Vendor column ensured/added');
         } catch (error) {
           // Column might already exist or already modified; ignore specific errors
           if (error.message.includes('Duplicate column name') || error.message.includes('check that column/key exists')) {
-            console.log('Vendor column already exists, skipping...');
+            logger.info('Vendor column already exists, skipping');
           } else {
-            console.log('Error adding vendor column:', error.message);
+            logger.error('Error adding vendor column', error);
           }
         }
       }
     }
+
+    // Create products table (vendor products)
+    const createProductsTableQuery = `
+      CREATE TABLE IF NOT EXISTS products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id INT NOT NULL,
+        image_url VARCHAR(500),
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        category VARCHAR(100),
+        quantity INT DEFAULT 0,
+        price DECIMAL(10,2) NOT NULL,
+        discount DECIMAL(5,2) DEFAULT 0.00,
+        is_premium BOOLEAN DEFAULT FALSE,
+        pickup_start_time DATETIME NULL,
+        pickup_end_time DATETIME NULL,
+        enable_today BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE
+      )
+    `;
+    await executeQuery(createProductsTableQuery);
+    console.log('✅ Products table ready');
+
+    // Create mystery_boxes table
+    const createMysteryBoxesTableQuery = `
+      CREATE TABLE IF NOT EXISTS mystery_boxes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id INT NOT NULL,
+        title VARCHAR(200) NULL,
+        price DECIMAL(10,2) NOT NULL,
+        quantity INT DEFAULT 0,
+        pickup_start_time DATETIME NULL,
+        pickup_end_time DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE
+      )
+    `;
+    await executeQuery(createMysteryBoxesTableQuery);
+    console.log('✅ Mystery Boxes table ready');
+
+    // Create mystery_box_items junction table
+    const createMysteryBoxItemsTableQuery = `
+      CREATE TABLE IF NOT EXISTS mystery_box_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        mystery_box_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (mystery_box_id) REFERENCES mystery_boxes(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `;
+    await executeQuery(createMysteryBoxItemsTableQuery);
+    console.log('✅ Mystery Box Items table ready');
+
+    // Create orders table (for both products and mystery boxes)
+    const createOrdersTableQuery = `
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id INT NOT NULL,
+        user_id INT NULL,
+        mystery_box_id INT NULL,
+        product_id INT NULL,
+        order_type ENUM('product','mystery_box') NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        description TEXT NULL,
+        pickup_start_time DATETIME NULL,
+        pickup_end_time DATETIME NULL,
+        status ENUM('in_progress','ready','completed') DEFAULT 'in_progress',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (mystery_box_id) REFERENCES mystery_boxes(id) ON DELETE SET NULL,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+      )
+    `;
+    await executeQuery(createOrdersTableQuery);
+    console.log('✅ Orders table ready');
   }
 });
 

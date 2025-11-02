@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add Product - Grabrush</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .container { max-width: 780px; margin:40px auto; background:#fff; padding:28px 32px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+    h1 { margin-top:0; font-size:28px; }
+    form { display:grid; gap:16px; }
+    .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    label { font-weight:600; font-size:14px; display:flex; flex-direction:column; }
+    input[type=text], input[type=number], input[type=datetime-local], textarea { margin-top:6px; padding:10px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
+    textarea { resize:vertical; min-height:110px; }
+    .actions { display:flex; gap:12px; }
+    .btn { background:#4CAF50; color:#fff; border:none; padding:12px 22px; border-radius:8px; font-weight:600; cursor:pointer; }
+    .btn.secondary { background:#555; }
+    .statusBox { margin-top:12px; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Add New Product</h1>
+    <div class="actions">
+      <a href="/vendor/dashboard" class="btn secondary" style="text-decoration:none;display:inline-block;">Back to Dashboard</a>
+    </div>
+    <form id="productForm">
+      <label>Product Image URL
+        <input type="text" name="image_url" placeholder="https://..." />
+      </label>
+      <label>Product Name*
+        <input type="text" name="name" required />
+      </label>
+      <label>Category
+        <input type="text" name="category" />
+      </label>
+      <label>Quantity
+        <input type="number" name="quantity" min="0" value="0" />
+      </label>
+      <label>Price (USD)*
+        <input type="number" name="price" step="0.01" min="0" required />
+      </label>
+      <label>Discount
+        <input type="number" name="discount" step="0.01" min="0" />
+      </label>
+      <div class="row-2">
+        <label>Pickup Starts
+          <input type="datetime-local" name="pickup_start_time" />
+        </label>
+        <label>Pickup Ends
+          <input type="datetime-local" name="pickup_end_time" />
+        </label>
+      </div>
+      <label>Premium?
+        <select name="is_premium">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+      </label>
+      <label>Enable today?
+        <select name="enable_today">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+      </label>
+      <label>Description
+        <textarea name="description" placeholder="Describe the product"></textarea>
+      </label>
+      <div class="actions">
+        <button type="submit" class="btn">Create Product</button>
+      </div>
+      <div class="statusBox" id="statusBox"></div>
+    </form>
+  </div>
+
+  <script>
+    function formToJSON(form){ const data=new FormData(form); const obj={}; data.forEach((v,k)=>{ obj[k]=v; }); return obj; }
+    document.getElementById('productForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const status=document.getElementById('statusBox'); status.textContent='Saving...';
+      const payload=formToJSON(e.target);
+      payload.is_premium = payload.is_premium === 'true';
+      payload.enable_today = payload.enable_today === 'true';
+      if(!payload.price){ status.textContent='Price is required.'; return; }
+      try {
+        const res = await fetch('/vendor/products', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        const j=await res.json();
+        if(j.success){ status.style.color='green'; status.textContent='Created successfully.'; e.target.reset(); }
+        else { status.style.color='red'; status.textContent=j.error || 'Failed.'; console.error(j); }
+      } catch(err){ status.style.color='red'; status.textContent='Request failed.'; console.error(err); }
+    });
+  </script>
+</body>
+</html>

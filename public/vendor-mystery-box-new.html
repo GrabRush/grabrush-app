@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Mystery Box - Grabrush</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .container { max-width: 1000px; margin:40px auto; background:#fff; padding:30px 34px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+    h1 { margin-top:0; font-size:30px; }
+    .layout { display:grid; grid-template-columns: 2fr 1fr; gap:28px; }
+    .products-panel, .form-panel { display:flex; flex-direction:column; gap:16px; }
+    .product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; max-height:520px; overflow-y:auto; }
+    .product-card { background:#fafafa; border-radius:10px; padding:12px; display:flex; flex-direction:column; border:1px solid #e0e0e0; }
+    .product-card img { width:100%; height:120px; object-fit:cover; border-radius:6px; }
+    .product-name { font-weight:600; margin:8px 0 4px; }
+    .select-row { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+    input[type=text], input[type=number], input[type=datetime-local] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
+    label { font-weight:600; font-size:14px; display:flex; flex-direction:column; gap:6px; }
+    form { display:flex; flex-direction:column; gap:16px; }
+    .btn { background:#1976d2; color:#fff; border:none; padding:12px 22px; border-radius:8px; font-weight:600; cursor:pointer; }
+    .btn.primary { background:#4CAF50; }
+    .actions { display:flex; gap:12px; margin-bottom:20px; }
+    .chosen-list { background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; max-height:240px; overflow-y:auto; }
+    .chosen-item { font-size:13px; display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:6px 0; }
+    .remove-btn { background:#d32f2f; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; }
+    .statusBox { font-size:14px; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Create Mystery Box</h1>
+    <div class="actions">
+      <a href="/vendor/dashboard" class="btn" style="text-decoration:none;">Back to Dashboard</a>
+    </div>
+    <div class="layout">
+      <div class="products-panel">
+        <h2 style="margin:0;font-size:22px;">Select Products</h2>
+        <div class="product-grid" id="productGrid"></div>
+      </div>
+      <div class="form-panel">
+        <form id="boxForm">
+          <label>Title
+            <input type="text" name="title" placeholder="Optional title" />
+          </label>
+          <label>Price (USD)*
+            <input type="number" step="0.01" min="0" name="price" required />
+          </label>
+          <label>Quantity
+            <input type="number" min="0" name="quantity" value="0" />
+          </label>
+          <label>Pickup Start
+            <input type="datetime-local" name="pickup_start_time" />
+          </label>
+          <label>Pickup End
+            <input type="datetime-local" name="pickup_end_time" />
+          </label>
+          <div>
+            <div style="font-weight:600; margin-bottom:6px;">Chosen Items</div>
+            <div class="chosen-list" id="chosenList"></div>
+          </div>
+          <button type="submit" class="btn primary">Create Mystery Box</button>
+          <div class="statusBox" id="statusBox"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chosen = [];
+    function renderChosen(){
+      const list = document.getElementById('chosenList'); list.innerHTML='';
+      if(chosen.length===0){ list.innerHTML='<div style="color:#777;font-size:13px;">No items selected yet.</div>'; return; }
+      chosen.forEach((c,i)=>{
+        const div=document.createElement('div'); div.className='chosen-item';
+        div.innerHTML=`<span>${c.name} (x${c.quantity})</span><button class='remove-btn' data-index='${i}'>Remove</button>`;
+        list.appendChild(div);
+      });
+    }
+
+    async function loadProducts(){
+      try{ const res = await fetch('/vendor/products'); const j=await res.json(); if(j.success){
+        const grid=document.getElementById('productGrid'); grid.innerHTML='';
+        j.data.forEach(p=>{
+          const card=document.createElement('div'); card.className='product-card';
+          card.innerHTML=`<img src='${p.image_url || 'https://via.placeholder.com/300x180?text=No+Image'}' alt='${p.name}'/><div class='product-name'>${p.name}</div><div class='product-meta'>Qty: ${p.quantity} | $${Number(p.price).toFixed(2)}</div><div class='select-row'><label style='flex:1;'>Qty<select data-id='${p.id}' class='qtySelect'>${[1,2,3,4,5].map(n=>`<option value='${n}'>${n}</option>`).join('')}</select></label><button class='btn' data-id='${p.id}' data-name='${p.name}'>Add</button></div>`;
+          grid.appendChild(card);
+        });
+      }}catch(err){ console.error(err); }
+    }
+
+    document.getElementById('productGrid').addEventListener('click', (e)=>{
+      if(e.target.matches('button.btn[data-id]')){
+        const id = parseInt(e.target.getAttribute('data-id'),10);
+        const name = e.target.getAttribute('data-name');
+        const qtySelect = e.target.parentElement.querySelector('.qtySelect');
+        const qty = parseInt(qtySelect.value,10) || 1;
+        const existing = chosen.find(c=>c.id===id);
+        if(existing){ existing.quantity += qty; } else { chosen.push({ id, name, quantity: qty }); }
+        renderChosen();
+      }
+    });
+
+    document.getElementById('chosenList').addEventListener('click',(e)=>{
+      if(e.target.matches('button.remove-btn')){
+        const idx=parseInt(e.target.getAttribute('data-index'),10); chosen.splice(idx,1); renderChosen();
+      }
+    });
+
+    document.getElementById('boxForm').addEventListener('submit', async (e)=>{
+      e.preventDefault(); const status=document.getElementById('statusBox'); status.textContent='Submitting...';
+      if(chosen.length===0){ status.style.color='red'; status.textContent='Select at least one product.'; return; }
+      const fd = new FormData(e.target); const payload={}; fd.forEach((v,k)=>payload[k]=v);
+      payload.product_ids = chosen.map(c=>({ id:c.id, quantity:c.quantity }));
+      try{ const res = await fetch('/vendor/mystery-boxes', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); const j=await res.json(); if(j.success){ status.style.color='green'; status.textContent='Mystery box created.'; chosen.length=0; renderChosen(); e.target.reset(); } else { status.style.color='red'; status.textContent=j.error || 'Failed.'; console.error(j); }}catch(err){ status.style.color='red'; status.textContent='Request failed.'; console.error(err); }
+    });
+
+    loadProducts(); renderChosen();
+  </script>
+</body>
+</html>
