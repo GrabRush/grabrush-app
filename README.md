@@ -19,14 +19,29 @@ npm install
 
 ### 2. Database Setup
 Create a MySQL database and update the connection settings in `database.js` or set environment variables:
+Install docker.
+Then run:
+```
+docker run -d --name mysql-dev \
+  -e MYSQL_ROOT_PASSWORD='M@nchester1995' \
+  -e MYSQL_DATABASE='Practice' \
+  -e MYSQL_USER='myapp_user' \
+  -e MYSQL_PASSWORD='myapp_pass' \
+  -p 3307:3306 \
+  -v mysql-data:/var/lib/mysql \
+  mysql:8.0
+```
+Your MySQL server is now running at localhost:3307, and you have a database ready with the name "Practice"
 
+Now, if you use this environment variables:
 ```env
 DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=grabush
-DB_PORT=3306
+DB_PORT=3307
+DB_USER=myapp_user
+DB_PASSWORD=myapp_pass
+DB_NAME=Practice
 ```
+You are now ready to run the application.
 
 ### 3. Email Configuration
 For email verification to work, you need to configure email settings. Create a `.env` file:
@@ -46,7 +61,7 @@ EMAIL_PASS=your-app-password
 npm start
 ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://localhost:9000`
 
 ## User Flow
 
@@ -70,6 +85,3 @@ All pages have "Grabush" as the centered title.
 - Email verification before registration
 - Session-based authentication
 - SQL injection protection with parameterized queries
-
-
-
