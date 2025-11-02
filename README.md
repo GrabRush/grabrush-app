@@ -2,6 +2,8 @@
 
 Grabrush now supports both customer food discovery and vendor management of products and mystery boxes. Includes secure authentication, email verification, vendor dashboards, order status workflow, and dynamic inventory features.
 
+> Recent update: The codebase was modularized. Monolithic route logic in `app.js` has been split into focused modules under `src/` (auth, vendor, general pages, email helpers, database bootstrap, and a route aggregator). This makes onboarding and extension much simpler.
+
 ## Features
 
 ### Core (Customers)
@@ -29,6 +31,136 @@ Grabrush now supports both customer food discovery and vendor management of prod
 - Winston structured logging (JSON output, colorized console)
 - Graceful shutdown handling
 - Parameterized queries (mysql2) protecting against SQL injection
+- Modular architecture (separate routers & bootstrap initializer)
+
+## Project Structure
+
+```
+app.js                     # Server bootstrap: middleware, rate limiters, mounts aggregated router, starts server
+database.js                # MySQL pool & helper (executeQuery, testConnection, closeConnection)
+public/                    # Static frontend pages & assets
+  login.html
+  verify-email.html
+  register.html
+  food-photos.html
+  vendor-dashboard.html
+  vendor-product-new.html
+  vendor-mystery-box-new.html
+src/
+  logger.js                # Winston logger configuration (shared)
+  bootstrap.js             # initDatabase() - ensures schema & columns
+  email.js                 # createTransporter() & buildVerificationLink()
+  authRoutes.js            # /send-verification, /register, /login, /logout
+  vendorRoutes.js          # /vendor/* product, mystery box, metrics, orders
+  generalRoutes.js         # /welcome and future non-auth simple pages
+  routes/index.js          # buildRouter() combines auth, general, vendor routes
+```
+
+## Architecture Overview
+
+1. Request enters Express (`app.js`).
+2. Global middleware: JSON/urlencoded parsing, static file serving, session, rate limiting.
+3. Aggregated router (`buildRouter()`) delegates to:
+   - `authRoutes` for authentication & verification
+   - `generalRoutes` for generic logged-in pages (currently `/welcome`)
+   - `vendorRoutes` for vendor dashboard, products, mystery boxes, orders
+4. Vendor-specific endpoints enforce session + userType check in `vendorRoutes` middleware.
+5. Data access uses `executeQuery` with parameterized SQL.
+6. On server start: DB connection tested, `initDatabase()` runs idempotent DDL ensuring tables and columns.
+7. Logging centralized via `logger.js` (replace ad-hoc `console.log`).
+
+## Database Initialization Flow
+`initDatabase()` (in `src/bootstrap.js`) executes CREATE TABLE IF NOT EXISTS statements plus lenient ALTERs (wrapped in try/catch) so repeated launches are safe. If you add a new table or column:
+
+1. Add the DDL / ALTER to `bootstrap.js`.
+2. Keep ALTERs idempotent (ignore duplicate errors).
+3. Restart the server – schema adjusts automatically.
+
+## Adding a New Route / Feature
+
+1. Create a new router file under `src/` (e.g. `orderHistoryRoutes.js`).
+2. Export an Express Router instance.
+3. Import and mount it inside `src/routes/index.js` (decide a path prefix, e.g. `/orders`).
+4. If it needs DB, import `{ executeQuery }` from `database.js`.
+5. If it needs logging, import `logger` from `src/logger.js`.
+6. Add input validation with `express-validator` where appropriate.
+
+Example skeleton:
+```js
+// src/orderHistoryRoutes.js
+const express = require('express');
+const { executeQuery } = require('../database');
+const router = express.Router();
+router.get('/orders/history', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success:false, error:'Auth required'});
+  const result = await executeQuery('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC', [req.session.userId]);
+  if (!result.success) return res.status(500).json({ success:false, error: result.error });
+  res.json({ success:true, data: result.data });
+});
+module.exports = router;
+```
+Then in `src/routes/index.js`:
+```js
+const orderHistoryRoutes = require('../orderHistoryRoutes');
+router.use('/', orderHistoryRoutes);
+```
+
+## Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| PORT | Server port | 9000 |
+| NODE_ENV | Environment mode | development |
+| LOG_LEVEL | Winston log level | info |
+| DB_HOST | MySQL host | localhost |
+| DB_PORT | MySQL port | 3306/your docker mapping |
+| DB_USER | MySQL user | root (not recommended) |
+| DB_PASSWORD | MySQL password | (none) |
+| DB_NAME | Database name | Practice (example) |
+| EMAIL_USER | SMTP user (Gmail) | — |
+| EMAIL_PASS | SMTP app password | — |
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Server starts but tables missing | `initDatabase()` not executed | Ensure import & call remain in `app.js` after `testConnection()` |
+| Login always redirects to `/` | Session not persisting | Check cookie settings (secure flag in non-HTTPS) & ensure `express-session` secret stable |
+| Verification email not sent | Bad Gmail App Password or less secure settings | Regenerate App Password, verify `EMAIL_USER/PASS` |
+| 403 on vendor endpoints | Logged in as customer | Login with vendor account or ensure registration set `userType=vendor` |
+| Rate limit errors | Too many rapid requests | Adjust limits in `app.js` (loginLimiter / vendorApiLimiter) |
+| CORS issues (future APIs) | Access from different origin | Add and configure `cors` middleware |
+
+## Logging
+Use `logger.info('message')`, `logger.error(err)` instead of `console.log`. Output is timestamped & colorized for dev; JSON structure supports future log aggregation.
+
+## Security Hardening Ideas (Not Yet Implemented)
+Add `helmet`, CSRF protection for form posts, password reset flow, structured authorization roles beyond simple vendor/customer flag.
+
+## Testing (Suggested Setup)
+Install dev dependencies:
+```bash
+npm install --save-dev jest supertest
+```
+Add a basic test file in `tests/` and a script in `package.json`:
+```json
+"scripts": { "test": "jest" }
+```
+
+## Deployment Notes
+- Ensure `NODE_ENV=production` so cookies are secure and logs are appropriately leveled.
+- Provide real SMTP credentials.
+- Run behind a reverse proxy (NGINX) handling TLS; set `trust proxy` in Express if using secure cookies over proxy.
+
+## Contributing Guidelines (Internal)
+1. Keep route handlers thin; push complex logic into helper modules.
+2. Validate all external input.
+3. Prefer parameterized queries only (never string concat for SQL).
+4. Update this README when adding new top-level routes or environment variables.
+5. Run a quick manual test (login, product create, mystery box create) before pushing.
+
+---
+Below are the original instructions & reference details (unchanged) for quick access.
 
 ## Setup Instructions
 
@@ -200,6 +332,8 @@ orders(id, vendor_id FK, user_id FK, mystery_box_id FK NULL, product_id FK NULL,
 - Check logs: Winston prints structured logs to console.
 - Adjust rate limits in `app.js` for different environments.
 - Consider adding `helmet` for further HTTP header hardening.
+ - Use `src/bootstrap.js` for schema evolution (idempotent ALTERs only).
+ - New routers should be registered in `src/routes/index.js`.
 
 ## Future Improvements
 - Edit/Delete for products and mystery boxes
