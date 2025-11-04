@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabush - My Favorites</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .favorites-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .favorites-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .back-button {
+            background-color: #2196F3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .back-button:hover {
+            background-color: #1976D2;
+        }
+        
+        .favorites-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .favorite-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #e91e63;
+            position: relative;
+        }
+        
+        .remove-favorite {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #e91e63;
+            transition: transform 0.2s;
+        }
+        
+        .remove-favorite:hover {
+            transform: scale(1.2);
+        }
+        
+        .store-type {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .store-type.restaurant {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            color: #999;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container favorites-container">
+        <div class="favorites-header">
+            <h1 id="favorites-header-text">Favorites for you</h1>
+            <a href="/welcome" class="back-button">← Back to Welcome</a>
+        </div>
+        
+        <div id="favoritesList" class="favorites-list">
+            <!-- Favorites will be loaded here -->
+        </div>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>No favorites yet</h3>
+            <p>Start adding stores to your favorites from the Location page!</p>
+            <a href="/location" class="location-button">📍 Find Nearby Stores</a>
+        </div>
+    </div>
+
+    <script>
+        let userFavorites = [];
+        const favoritesHeaderText = document.getElementById('favorites-header-text');
+        
+        // Get user's first name and update header
+        fetch('/api/user-info')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.firstName) {
+                    favoritesHeaderText.textContent = `Favorites for ${data.firstName}`;
+                }
+            })
+            .catch(err => console.log('Could not fetch user info'));
+        
+        // Load favorites
+        async function loadFavorites() {
+            try {
+                const response = await fetch('/api/favorites');
+                const data = await response.json();
+                if (data.success) {
+                    userFavorites = data.favorites || [];
+                    displayFavorites();
+                }
+            } catch (error) {
+                console.error('Error loading favorites:', error);
+                document.getElementById('favoritesList').innerHTML = '<p style="color: red;">Error loading favorites. Please try again.</p>';
+            }
+        }
+        
+        // Remove favorite
+        async function removeFavorite(storeName) {
+            try {
+                const response = await fetch('/api/favorites/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storeName })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    userFavorites = data.favorites;
+                    displayFavorites();
+                }
+            } catch (error) {
+                console.error('Error removing favorite:', error);
+                alert('Error removing favorite. Please try again.');
+            }
+        }
+        
+        // Display favorites
+        function displayFavorites() {
+            const favoritesList = document.getElementById('favoritesList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (userFavorites.length === 0) {
+                favoritesList.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            favoritesList.style.display = 'grid';
+            emptyState.style.display = 'none';
+            
+            favoritesList.innerHTML = userFavorites.map(store => `
+                <div class="favorite-card">
+                    <span class="remove-favorite" onclick="removeFavorite('${store.name}')" title="Remove from favorites">❤️</span>
+                    <span class="store-type ${store.type}">${store.type === 'restaurant' ? '🍽️ Restaurant' : '🛒 Grocery'}</span>
+                    <h4>${store.name}</h4>
+                    ${store.lat && store.lng ? `<div class="store-distance">📍 Location: ${store.lat.toFixed(4)}, ${store.lng.toFixed(4)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Load on page load
+        loadFavorites();
+    </script>
+</body>
+</html>
+

@@ -225,3 +225,103 @@ small {
     border-bottom-color: #4CAF50;
     font-weight: bold;
 }
+
+/* Location button */
+.location-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 14px;
+    display: inline-block;
+    transition: background-color 0.3s;
+}
+
+.location-button:hover {
+    background-color: #45a049;
+}
+
+/* Store cards grid for welcome page */
+.stores-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.store-card {
+    background: white;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid #4CAF50;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.store-card .store-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+}
+
+.store-card .store-content {
+    padding: 15px;
+}
+
+.store-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.store-card .heart-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    z-index: 10;
+}
+
+.store-card .heart-icon:hover {
+    transform: scale(1.2);
+}
+
+.store-card .heart-icon.unfilled {
+    color: white;
+    text-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+.store-card .heart-icon.filled {
+    color: #e91e63;
+}
+
+.store-card .store-type {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #e3f2fd;
+    color: #1976d2;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.store-card .store-type.restaurant {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.store-card h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.store-card .store-distance {
+    color: #666;
+    font-size: 14px;
+    margin-top: 8px;
+}
