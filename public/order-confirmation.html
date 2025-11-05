@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabrush - Order Confirmation</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+        
+        .order-confirmation-container {
+            background: #fff;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        .order-header {
+            background: #fff;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid #e0e0e0;
+            position: relative;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            color: #333;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            position: absolute;
+            left: 16px;
+            z-index: 10;
+        }
+        
+        .order-header-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .order-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            width: 100%;
+        }
+        
+        .restaurant-name-header {
+            margin: 4px 0 0 0;
+            font-size: 14px;
+            color: #FF6B35;
+            font-weight: 500;
+        }
+        
+        .order-id-display {
+            padding: 16px;
+            color: #666;
+            font-size: 14px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .order-status-section {
+            padding: 20px 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .order-status-card {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        
+        .order-status-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .order-status-icon {
+            width: 40px;
+            height: 40px;
+            background: #4CAF50;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .order-status-text {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .restaurant-logo-small {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .pickup-time-large {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+            margin: 16px 0 8px 0;
+        }
+        
+        .shop-closes-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .pickup-instructions {
+            background: #f9f9f9;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .pickup-instructions-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .pickup-instructions-text {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .warning-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(255, 152, 0, 0.1);
+            border-radius: 8px;
+            color: #ff9800;
+            font-size: 12px;
+        }
+        
+        .order-details-section {
+            padding: 20px 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .order-details-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .detail-label {
+            color: #666;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .view-details-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 12px;
+            cursor: pointer;
+        }
+        
+        .view-details-toggle svg {
+            transition: transform 0.3s;
+        }
+        
+        .view-details-text {
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .disclaimer-section {
+            padding: 20px 16px;
+        }
+        
+        .disclaimer-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .disclaimer-text {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="order-confirmation-container">
+        <div class="order-header">
+            <button class="back-button" onclick="window.history.back()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <div class="order-header-content">
+                <h1>My Cart</h1>
+                <p class="restaurant-name-header" id="restaurantNameHeader">Loading...</p>
+            </div>
+        </div>
+        
+        <div class="order-id-display" id="orderIdDisplay">Order ID #1311</div>
+        
+        <div id="orderContent">
+            <!-- Order content will be loaded here -->
+        </div>
+        
+        <nav class="bottom-nav">
+            <a href="/welcome" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="/cart" class="nav-item active cart-icon" style="position: relative;">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#4CAF50"/>
+                </svg>
+                <span style="color: #4CAF50;">Cart</span>
+                <span style="position: absolute; top: -2px; right: 8px; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; border: 2px solid white;"></span>
+            </a>
+            <a href="/favorites" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Favourites</span>
+            </a>
+            <a href="/account" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Account</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="/order-confirmation.js"></script>
+</body>
+</html>
+

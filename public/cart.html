@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabrush - My Cart</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: #1a1a1a !important; color: #fff; }
+        
+        .cart-container {
+            background: #1a1a1a;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        .cart-header {
+            background: #1a1a1a;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid #333;
+            position: relative;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            position: absolute;
+            left: 16px;
+            z-index: 10;
+        }
+        
+        .cart-header-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .cart-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            width: 100%;
+        }
+        
+        .restaurant-name-header {
+            margin: 4px 0 0 0;
+            font-size: 14px;
+            color: #4CAF50;
+            font-weight: 500;
+        }
+        
+        .order-id {
+            padding: 16px;
+            color: #999;
+            font-size: 14px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .pickup-card {
+            background: #2a2a2a;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        
+        .pickup-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+        
+        .location-section {
+            margin-bottom: 20px;
+        }
+        
+        .location-info {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .location-icon {
+            width: 20px;
+            height: 20px;
+            color: #4CAF50;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .location-details {
+            flex: 1;
+        }
+        
+        .location-address {
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .location-city {
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .change-location-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        
+        .pickup-time-section {
+            margin-bottom: 16px;
+        }
+        
+        .pickup-time-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .pickup-time-label {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .time-slot {
+            background: #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .time-slot.selected {
+            background: #4CAF50;
+        }
+        
+        .shop-closes {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+        
+        .shop-closes-label {
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .warning-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(255, 152, 0, 0.1);
+            border-radius: 8px;
+            color: #ff9800;
+            font-size: 12px;
+            margin-top: 16px;
+        }
+        
+        .order-summary {
+            margin: 16px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 12px;
+        }
+        
+        .order-summary-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+        
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        .order-item-name {
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .order-item-price {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .cost-breakdown {
+            border-top: 1px solid #333;
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+        
+        .cost-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .cost-label {
+            color: #999;
+        }
+        
+        .cost-value {
+            color: #fff;
+        }
+        
+        .disclaimer {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #333;
+        }
+        
+        .disclaimer-title {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .disclaimer-text {
+            color: #999;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        .total-section {
+            margin: 16px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 12px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .total-label {
+            color: #999;
+            font-size: 14px;
+        }
+        
+        .total-amount {
+            color: #4CAF50;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .see-breakdown {
+            color: #4CAF50;
+            font-size: 12px;
+            text-decoration: none;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        
+        .confirm-button {
+            background: #4CAF50;
+            color: #fff;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            width: 100%;
+            margin-top: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .confirm-button:hover {
+            background: #45a049;
+        }
+        
+        .empty-cart {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-cart h2 {
+            color: #fff;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="cart-container">
+        <div class="cart-header">
+            <button class="back-button" onclick="window.history.back()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <div class="cart-header-content">
+                <h1>My Cart</h1>
+                <p class="restaurant-name-header" id="restaurantNameHeader">Loading...</p>
+            </div>
+        </div>
+        
+        <div class="order-id" id="orderId">Order ID #1311</div>
+        
+        <div id="cartContent">
+            <!-- Cart content will be loaded here -->
+        </div>
+        
+        <nav class="bottom-nav">
+            <a href="/welcome" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="/cart" class="nav-item active">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Cart</span>
+            </a>
+            <a href="/favorites" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Favourites</span>
+            </a>
+            <a href="/account" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Account</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="/cart.js"></script>
+</body>
+</html>
+

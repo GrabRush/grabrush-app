@@ -4,36 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grabush - My Favorites</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <style>
-        .favorites-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .favorites-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        
-        .back-button {
-            background-color: #2196F3;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .back-button:hover {
-            background-color: #1976D2;
-        }
-        
+        body { max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
         .favorites-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -42,21 +15,41 @@
         
         .favorite-card {
             background: white;
-            padding: 20px;
+            padding: 0;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             border-left: 4px solid #e91e63;
             position: relative;
+            overflow: hidden;
+        }
+        
+        .favorite-card-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .favorite-card-content {
+            padding: 16px;
         }
         
         .remove-favorite {
             position: absolute;
-            top: 15px;
-            right: 15px;
+            top: 20px;
+            right: 20px;
             font-size: 24px;
             cursor: pointer;
             color: #e91e63;
             transition: transform 0.2s;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .remove-favorite:hover {
@@ -96,21 +89,52 @@
     </style>
 </head>
 <body>
-    <div class="container favorites-container">
-        <div class="favorites-header">
-            <h1 id="favorites-header-text">Favorites for you</h1>
-            <a href="/welcome" class="back-button">← Back to Welcome</a>
-        </div>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-top">
+                <h1 style="color: white; font-size: 18px; margin: 0;" id="favorites-header-text">Favorites for you</h1>
+            </div>
+        </header>
         
-        <div id="favoritesList" class="favorites-list">
-            <!-- Favorites will be loaded here -->
-        </div>
+        <main class="main-content" style="padding: 16px;">
+            <div id="favoritesList" class="favorites-list">
+                <!-- Favorites will be loaded here -->
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <h3>No favorites yet</h3>
+                <p>Start adding stores to your favorites from the Location page!</p>
+                <a href="/location" style="background-color: #4CAF50; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">📍 Find Nearby Stores</a>
+            </div>
+        </main>
         
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <h3>No favorites yet</h3>
-            <p>Start adding stores to your favorites from the Location page!</p>
-            <a href="/location" class="location-button">📍 Find Nearby Stores</a>
-        </div>
+        <nav class="bottom-nav">
+            <a href="/welcome" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="/cart" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Cart</span>
+            </a>
+            <a href="/favorites" class="nav-item active">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Favourites</span>
+            </a>
+            <a href="/account" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Account</span>
+            </a>
+        </nav>
     </div>
 
     <script>
@@ -176,14 +200,49 @@
             favoritesList.style.display = 'grid';
             emptyState.style.display = 'none';
             
-            favoritesList.innerHTML = userFavorites.map(store => `
-                <div class="favorite-card">
-                    <span class="remove-favorite" onclick="removeFavorite('${store.name}')" title="Remove from favorites">❤️</span>
-                    <span class="store-type ${store.type}">${store.type === 'restaurant' ? '🍽️ Restaurant' : '🛒 Grocery'}</span>
-                    <h4>${store.name}</h4>
-                    ${store.lat && store.lng ? `<div class="store-distance">📍 Location: ${store.lat.toFixed(4)}, ${store.lng.toFixed(4)}</div>` : ''}
-                </div>
-            `).join('');
+            favoritesList.innerHTML = userFavorites.map(store => {
+                // Get image based on store name
+                const storeImages = {
+                    'Fresh Market': 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800&auto=format&fit=crop',
+                    'Green Grocers': 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop',
+                    'Bella Vista Restaurant': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop',
+                    'The Gourmet Kitchen': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&auto=format&fit=crop',
+                    'City Market': 'https://images.unsplash.com/photo-1587132137056-bfbf0166836f?q=80&w=800&auto=format&fit=crop',
+                    'Seaside Bistro': 'https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?q=80&w=800&auto=format&fit=crop',
+                    'Mountain View Cafe': 'https://images.unsplash.com/photo-1515669097368-22e68427d265?q=80&w=800&auto=format&fit=crop',
+                    'Downtown Diner': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=800&auto=format&fit=crop',
+                    'Organic Foods': 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop',
+                    'The Rustic Table': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800&auto=format&fit=crop',
+                    'Super Mart': 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800&auto=format&fit=crop',
+                    'Food Express': 'https://images.unsplash.com/photo-1587132137056-bfbf0166836f?q=80&w=800&auto=format&fit=crop',
+                    'Corner Store': 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop',
+                    'Pizza Palace': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop',
+                    'Quick Bite': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&auto=format&fit=crop',
+                    'Local Market': 'https://images.unsplash.com/photo-1587132137056-bfbf0166836f?q=80&w=800&auto=format&fit=crop',
+                    'Ruen Busaba': 'https://images.unsplash.com/photo-1551782450-17144efb9c50?q=80&w=800&auto=format&fit=crop',
+                    'Pizzaria': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=800&auto=format&fit=crop',
+                    'Lonestar Steakhouse': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=800&auto=format&fit=crop',
+                    'Yum Cha District': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=800&auto=format&fit=crop'
+                };
+                
+                const defaultImage = store.type === 'restaurant' 
+                    ? 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop'
+                    : 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800&auto=format&fit=crop';
+                
+                const storeImage = storeImages[store.name] || defaultImage;
+                
+                return `
+                    <div class="favorite-card">
+                        <img src="${storeImage}" alt="${store.name}" class="favorite-card-image" loading="lazy">
+                        <div class="favorite-card-content">
+                            <span class="remove-favorite" onclick="removeFavorite('${store.name.replace(/'/g, "\\'")}')" title="Remove from favorites">❤️</span>
+                            <span class="store-type ${store.type}">${store.type === 'restaurant' ? '🍽️ Restaurant' : '🛒 Grocery'}</span>
+                            <h4>${store.name}</h4>
+                            ${store.lat && store.lng ? `<div class="store-distance">📍 Location: ${store.lat.toFixed(4)}, ${store.lng.toFixed(4)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
         // Load on page load
@@ -191,4 +250,3 @@
     </script>
 </body>
 </html>
-

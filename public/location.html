@@ -5,36 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grabush - Find Nearby Stores</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <style>
-        .location-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .location-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .back-button {
-            background-color: #2196F3;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        
-        .back-button:hover {
-            background-color: #1976D2;
-        }
-        
+        body { max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
         #map {
             height: 500px;
             width: 100%;
@@ -157,20 +130,6 @@
             margin-top: 8px;
         }
         
-        .location-button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-block;
-        }
-        
-        .location-button:hover {
-            background-color: #45a049;
-        }
-        
         .error-message {
             background-color: #f8d7da;
             color: #721c24;
@@ -182,30 +141,61 @@
     </style>
 </head>
 <body>
-    <div class="container location-container">
-        <div class="location-header">
-            <h1 id="location-header-text">Hi there! See what's available near you</h1>
-            <a href="/welcome" class="back-button">← Back to Welcome</a>
-        </div>
-        
-        <div id="error-message" class="error-message" style="display: none;"></div>
-        
-        <div id="map"></div>
-        
-        <div class="radius-control">
-            <h3>Search Radius</h3>
-            <input type="range" id="radiusSlider" class="radius-slider" min="1" max="10" value="3" step="0.5">
-            <div class="radius-value">
-                <span id="radiusValue">3</span> km
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-top">
+                <h1 style="color: white; font-size: 18px; margin: 0;" id="location-header-text">Hi there! See what's available near you</h1>
             </div>
-        </div>
+        </header>
         
-        <div id="storesContainer">
-            <h2>Stores within <span id="storesRadius">3</span> km</h2>
-            <div id="storesList" class="stores-list">
-                <!-- Stores will be loaded here -->
+        <main class="main-content" style="padding: 16px;">
+            <div id="error-message" class="error-message" style="display: none;"></div>
+            
+            <div id="map"></div>
+            
+            <div class="radius-control">
+                <h3>Search Radius</h3>
+                <input type="range" id="radiusSlider" class="radius-slider" min="1" max="10" value="3" step="0.5">
+                <div class="radius-value">
+                    <span id="radiusValue">3</span> km
+                </div>
             </div>
-        </div>
+            
+            <div id="storesContainer">
+                <h2>Stores within <span id="storesRadius">3</span> km</h2>
+                <div id="storesList" class="stores-list">
+                    <!-- Stores will be loaded here -->
+                </div>
+            </div>
+        </main>
+        
+        <nav class="bottom-nav">
+            <a href="/welcome" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="/cart" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Cart</span>
+            </a>
+            <a href="/favorites" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Favourites</span>
+            </a>
+            <a href="/account" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Account</span>
+            </a>
+        </nav>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -540,4 +530,3 @@
     </script>
 </body>
 </html>
-

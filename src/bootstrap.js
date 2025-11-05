@@ -25,7 +25,8 @@ async function initDatabase() {
     'ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NULL',
     'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE',
     'ALTER TABLE users ADD COLUMN verification_token VARCHAR(255)',
-    'ALTER TABLE users ADD COLUMN favorites TEXT NULL'
+    'ALTER TABLE users ADD COLUMN favorites TEXT NULL',
+    'ALTER TABLE users ADD COLUMN cart TEXT NULL'
   ];
   for (const q of userAlterQueries) {
     try { await executeQuery(q); } catch (e) { /* ignore duplicate/exists */ }
