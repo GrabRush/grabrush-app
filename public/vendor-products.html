@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Products - Vendor</title>
+<link rel="stylesheet" href="/style.css" />
+<style>
+ body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background:#f5f5f5; padding-bottom:70px; }
+ .page { max-width:1100px; margin:0 auto; padding:16px 20px 100px; }
+ h1 { font-size:22px; margin:0 0 12px; }
+ .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+ .filters button { background:#fff; border:1px solid #ddd; padding:8px 14px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600; color:#333; }
+ .filters button.active { background:#4CAF50; color:#fff; border-color:#4CAF50; }
+ .list { display:grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+ .card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 2px 6px rgba(0,0,0,0.06); display:flex; flex-direction:column; }
+ .card h3 { margin:0 0 6px; font-size:15px; }
+ .price { font-size:14px; font-weight:600; }
+ .desc { font-size:12px; color:#555; margin:4px 0 8px; flex:1; }
+ .badge-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+ .badge { background:#eee; color:#555; font-size:10px; padding:3px 8px; border-radius:12px; font-weight:600; }
+ .badge.premium { background:#FFD54F; color:#6d4c00; }
+ .badge.discount { background:#C8E6C9; color:#2E7D32; }
+ .qty { font-size:11px; color:#666; margin-bottom:8px; }
+ .actions { display:flex; gap:6px; }
+ .actions button, .actions a { flex:1; background:#4CAF50; color:#fff; border:none; padding:8px 10px; font-size:12px; border-radius:6px; cursor:pointer; text-align:center; text-decoration:none; }
+ .actions button.delete { background:#ff5252; }
+ .empty { grid-column:1/-1; text-align:center; padding:40px; color:#666; font-size:13px; }
+ .add-new { position:fixed; right:18px; bottom:78px; background:#4CAF50; color:#fff; border:none; width:54px; height:54px; border-radius:50%; font-size:30px; line-height:54px; text-align:center; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.25); }
+ .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 2px solid #d0d0d0; height: 64px; box-shadow: 0 -2px 6px rgba(0,0,0,0.08); z-index: 100; padding: 0 8px; }
+ .bottom-nav .nav-item { flex: 1; text-align: left; text-decoration: none; font-size: 14px; color: #444; display: flex; flex-direction: row; gap: 8px; padding: 0 12px; align-items: center; font-weight: 600; border-right: 1px solid #eee; }
+ .bottom-nav .nav-item:last-child { border-right: none; }
+ .bottom-nav .nav-item.active { color: #2e7d32; background: #e8f5e9; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Products</h1>
+    <div class="filters" id="filters"></div>
+    <div class="list" id="productList"></div>
+  </div>
+  <a class="add-new" href="/vendor/products/new">+</a>
+  <nav class="bottom-nav">
+    <a href="/vendor/dashboard" class="nav-item" data-nav="home"><span>Home</span></a>
+    <a href="/vendor/orders-page" class="nav-item" data-nav="orders"><span>Orders</span></a>
+    <a href="/vendor/products-page" class="nav-item active" data-nav="products"><span>Products</span></a>
+    <a href="/vendor/account" class="nav-item" data-nav="account"><span>Account</span></a>
+  </nav>
+<script>
+  const filterDefs=[
+    {key:'all', label:'All'},
+    {key:'mystery', label:'Mystery Boxes'},
+    {key:'premium', label:'Premium'},
+    {key:'discounted', label:'Discounted'}
+  ];
+  let currentFilter='all';
+  async function fetchJSON(u,o={}){ const r= await fetch(u,o); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+  function renderFilters(){ const c=document.getElementById('filters'); c.innerHTML=''; filterDefs.forEach(f=>{ const b=document.createElement('button'); b.textContent=f.label; if(f.key===currentFilter) b.classList.add('active'); b.onclick=()=>{ currentFilter=f.key; renderFilters(); load(); }; c.appendChild(b); }); }
+  function card(item){ const d=document.createElement('div'); d.className='card'; const badges=[]; if(item.type==='mystery_box') badges.push('<span class="badge mystery">Mystery</span>'); if(item.is_premium) badges.push('<span class="badge premium">Premium</span>'); if(Number(item.discount)>0) badges.push('<span class="badge discount">Discount</span>'); d.innerHTML=`<h3>${item.name || item.title || 'Item'}</h3><div class='badge-row'>${badges.join('')}</div><div class='price'>$${Number(item.price).toFixed(2)}</div><div class='desc'>${item.description||''}</div><div class='qty'>Left: ${item.quantity}</div><div class='actions'></div>`; const actions=d.querySelector('.actions'); if(item.type==='product'){ const edit=document.createElement('a'); edit.href='/vendor/product-edit?id='+item.id; edit.textContent='Edit'; actions.appendChild(edit); const del=document.createElement('button'); del.textContent='Delete'; del.className='delete'; del.onclick=()=>destroy(item.id); actions.appendChild(del); } return d; }
+  async function load(){ try { const resp = await fetchJSON('/vendor/catalog?filter='+encodeURIComponent(currentFilter)); if(!resp.success) throw new Error(resp.error||'Failed'); const list=document.getElementById('productList'); list.innerHTML=''; if(resp.data.length===0){ list.innerHTML='<div class="empty">No items</div>'; return; } resp.data.forEach(i=>list.appendChild(card(i))); } catch(e){ alert(e.message); } }
+  async function destroy(id){ if(!confirm('Delete this product?')) return; try { const r= await fetchJSON('/vendor/products/'+id,{ method:'DELETE' }); if(!r.success) throw new Error(r.error||'Delete failed'); load(); } catch(e){ alert(e.message); } }
+  renderFilters(); load();
+</script>
+</body>
+</html>

@@ -44,8 +44,9 @@ async function executeQuery(sql, params = []) {
     const [rows] = await promisePool.execute(sql, params);
     return { success: true, data: rows };
   } catch (error) {
-    console.error('Query execution failed:', error.message);
-    return { success: false, error: error.message };
+    // Enhanced logging to help diagnose parameter / statement issues
+    console.error('Query execution failed:', error.message, '\nSQL:', sql, '\nParams:', JSON.stringify(params));
+    return { success: false, error: error.message, sql, params };
   }
 }
 

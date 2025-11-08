@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders - Vendor</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background:#f5f5f5; padding-bottom:70px; }
+    .page { max-width: 1100px; margin:0 auto; padding:16px 20px 100px; }
+    h1 { font-size:22px; margin:0 0 20px; }
+    .orders-section { margin-bottom:34px; }
+    .orders-section h2 { font-size:16px; margin:0 0 12px; font-weight:600; color:#333; }
+    .orders-grid { display:flex; flex-direction:column; gap:12px; }
+    .order-card { background:#fff; border-radius:10px; padding:14px 16px; box-shadow:0 2px 6px rgba(0,0,0,0.06); display:flex; justify-content:space-between; align-items:flex-start; }
+    .order-left { flex:1; }
+    .order-title { font-size:15px; font-weight:600; margin:0 0 4px; }
+    .order-details { font-size:13px; color:#555; margin:2px 0 4px; }
+    .order-pickup { font-size:11px; color:#FF9800; }
+    .order-right { text-align:right; }
+    .order-price { font-size:16px; font-weight:600; margin-bottom:6px; }
+    .status-pill { display:inline-block; padding:4px 10px; font-size:11px; border-radius:14px; font-weight:600; }
+    .status-in_progress { background:#e0e0e0; color:#424242; }
+    .status-ready { background:#FFE082; color:#E65100; }
+    .status-completed { background:#C8E6C9; color:#2E7D32; }
+    .order-actions button { background:#4CAF50; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer; }
+    .order-actions button.secondary { background:#FF9800; }
+    .empty { text-align:center; padding:30px; color:#666; font-size:13px; }
+    .refresh-btn { position:fixed; top:14px; right:14px; background:#4CAF50; border:none; color:#fff; padding:8px 14px; border-radius:20px; font-weight:600; cursor:pointer; font-size:12px; }
+    /* Bottom Nav reused */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 2px solid #d0d0d0; height: 64px; box-shadow: 0 -2px 6px rgba(0,0,0,0.08); z-index: 100; padding: 0 8px; }
+  .bottom-nav .nav-item { flex: 1; text-align: left; text-decoration: none; font-size: 14px; color: #444; display: flex; flex-direction: row; gap: 8px; padding: 0 12px; align-items: center; font-weight: 600; border-right: 1px solid #eee; }
+  .bottom-nav .nav-item:last-child { border-right: none; }
+  .bottom-nav .nav-item.active { color: #2e7d32; background: #e8f5e9; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <button class="refresh-btn" id="refreshBtn">Refresh</button>
+  <div class="page">
+    <h1>Orders</h1>
+    <div class="orders-section" id="section-in_progress">
+      <h2>New Orders</h2>
+      <div class="orders-grid" id="grid-in_progress"></div>
+    </div>
+    <div class="orders-section" id="section-ready">
+      <h2>Ready</h2>
+      <div class="orders-grid" id="grid-ready"></div>
+    </div>
+    <div class="orders-section" id="section-completed">
+      <h2>Completed</h2>
+      <div class="orders-grid" id="grid-completed"></div>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <a href="/vendor/dashboard" class="nav-item" data-nav="home"><span>Home</span></a>
+    <a href="/vendor/orders-page" class="nav-item active" data-nav="orders"><span>Orders</span></a>
+    <a href="/vendor/products-page" class="nav-item" data-nav="products"><span>Products</span></a>
+    <a href="/vendor/account" class="nav-item" data-nav="account"><span>Account</span></a>
+  </nav>
+  <script>
+    async function fetchJSON(url, options={}){ const res = await fetch(url, { headers:{'Content-Type':'application/json'}, ...options }); if(!res.ok) throw new Error('Request failed '+res.status); return res.json(); }
+    function formatTime(dt){ if(!dt) return ''; const d = new Date(dt); let h=d.getHours(), m=d.getMinutes(); const am=h>=12?'PM':'AM'; const dispH = h%12||12; return dispH+":"+(m<10?"0"+m:m)+" "+am; }
+    function pickupWindow(s,e){ if(!s||!e) return ''; return formatTime(s)+" - "+formatTime(e); }
+
+    function orderCard(o){
+      const div=document.createElement('div'); div.className='order-card';
+      const type = o.order_type==='mystery_box' ? 'Mystery Box' : 'Product';
+      const details = o.order_type==='mystery_box' ? (o.mystery_box_product_names || 'Surprise selection') : (o.description || o.item_title || '');
+  div.innerHTML = `<div class="order-left">\n        <div class="order-title">#${o.id} - ${type}</div>\n        <div class="order-details">${details}</div>\n        ${pickupWindow(o.pickup_start_time,o.pickup_end_time)?`<div class='order-pickup'>Pickup: ${pickupWindow(o.pickup_start_time,o.pickup_end_time)}</div>`:''}\n      </div>\n      <div class="order-right">\n        <div class="order-price">$${Number(o.price).toFixed(2)}</div>\n        <div class="status-pill status-${o.status}">${o.status==='in_progress' ? 'New' : o.status.replace('_',' ')}</div>\n        <div class="order-actions"></div>\n      </div>`;
+      const actions = div.querySelector('.order-actions');
+      if(o.status==='in_progress'){
+        const btn=document.createElement('button'); btn.textContent='Mark as Ready'; btn.onclick=()=>updateStatus(o.id,'ready'); actions.appendChild(btn);
+      } else if(o.status==='ready'){
+        const btn=document.createElement('button'); btn.textContent='Mark as Completed'; btn.className='secondary'; btn.onclick=()=>updateStatus(o.id,'completed'); actions.appendChild(btn);
+      }
+      return div;
+    }
+
+    async function loadOrders(){
+      try {
+        const data = await fetchJSON('/vendor/orders');
+        if(!data.success) throw new Error('Failed to load orders');
+        const byStatus = { in_progress: [], ready: [], completed: [] };
+        data.data.forEach(o=>{ if(byStatus[o.status]) byStatus[o.status].push(o); });
+        ['in_progress','ready','completed'].forEach(st => {
+          const grid=document.getElementById('grid-'+st); grid.innerHTML='';
+          if(byStatus[st].length===0){
+            const label = st==='in_progress' ? 'new' : st.replace('_',' ');
+            grid.innerHTML = `<div class='empty'>No ${label} orders</div>`;
+          }
+          else { byStatus[st].forEach(o=>grid.appendChild(orderCard(o))); }
+        });
+      } catch(e){ console.error(e); }
+    }
+
+    async function updateStatus(id,status){
+      try {
+        await fetchJSON('/vendor/orders/'+id+'/status', { method:'PUT', body: JSON.stringify({ status }) });
+        loadOrders();
+      } catch(e){ alert('Failed to update order '+id+': '+e.message); }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadOrders);
+    loadOrders();
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Edit Product - Vendor</title>
+<link rel="stylesheet" href="/style.css" />
+<style>
+ body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background:#f5f5f5; padding-bottom:70px; }
+ .page { max-width:700px; margin:0 auto; padding:20px 20px 120px; }
+ h1 { font-size:22px; margin:0 0 16px; }
+ form { background:#fff; padding:18px 20px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+ label { display:block; font-size:12px; font-weight:600; margin:12px 0 6px; }
+ input[type=text], input[type=number], textarea { width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:8px; font-size:14px; font-family:inherit; }
+ textarea { min-height:120px; resize:vertical; }
+ .row { display:flex; gap:12px; }
+ .row .col { flex:1; }
+ .actions { margin-top:18px; display:flex; gap:12px; }
+ button { background:#4CAF50; color:#fff; border:none; padding:12px 18px; font-size:14px; border-radius:8px; cursor:pointer; font-weight:600; }
+ .cancel { background:#777; }
+ .status { margin-top:10px; font-size:13px; }
+ .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #ddd; height: 56px; box-shadow: 0 -2px 6px rgba(0,0,0,0.06); z-index: 100; }
+ .bottom-nav .nav-item { flex: 1; text-align: center; text-decoration: none; font-size: 12px; color: #555; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 500; }
+ .bottom-nav .nav-item.active { color: #4CAF50; font-weight: 600; }
+ @media (min-width: 900px) { .bottom-nav { max-width: 600px; margin: 0 auto; left: 50%; transform: translateX(-50%); border-radius: 12px 12px 0 0; } }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Edit Product</h1>
+    <form id="editForm">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" required />
+      <label for="description">Description</label>
+      <textarea id="description" name="description"></textarea>
+      <div class="row">
+        <div class="col">
+          <label for="price">Price</label>
+          <input type="number" step="0.01" id="price" name="price" required />
+        </div>
+        <div class="col">
+          <label for="discount">Discount*</label>
+          <input type="number" step="0.01" id="discount" name="discount" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label for="quantity">Quantity</label>
+          <input type="number" id="quantity" name="quantity" />
+        </div>
+        <div class="col">
+          <label for="category">Category</label>
+          <input type="text" id="category" name="category" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label for="is_premium">Premium?</label>
+          <select id="is_premium" name="is_premium">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="col">
+          <label for="enable_today">Enable Today?</label>
+          <select id="enable_today" name="enable_today">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save Changes</button>
+        <button type="button" class="cancel" id="cancelBtn">Cancel</button>
+      </div>
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+  <nav class="bottom-nav">
+    <a href="/vendor/dashboard" class="nav-item" data-nav="home"><span>Home</span></a>
+    <a href="/vendor/orders-page" class="nav-item" data-nav="orders"><span>Orders</span></a>
+    <a href="/vendor/products-page" class="nav-item active" data-nav="products"><span>Products</span></a>
+    <a href="/vendor/account" class="nav-item" data-nav="account"><span>Account</span></a>
+  </nav>
+<script>
+  function getParam(key){ const u=new URL(window.location.href); return u.searchParams.get(key); }
+  async function fetchJSON(url,opt={}){ const r= await fetch(url,{ headers:{'Content-Type':'application/json'}, ...opt}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+  const id = getParam('id'); if(!id){ document.getElementById('editForm').innerHTML='<p>No product id provided.</p>'; }
+  async function load(){ try { const data = await fetchJSON('/vendor/products'); if(!data.success) throw new Error('Load failed'); const prod = data.data.find(p=>String(p.id)===String(id)); if(!prod){ document.getElementById('editForm').innerHTML='<p>Product not found.</p>'; return; } Object.entries({ name:prod.name, description:prod.description||'', price:prod.price, discount:prod.discount, quantity:prod.quantity, category:prod.category||'', is_premium: prod.is_premium?1:0, enable_today: prod.enable_today?1:0 }).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; }); } catch(e){ document.getElementById('status').textContent=e.message; }
+  }
+  async function save(e){ e.preventDefault(); const payload={ name: name.value, description: description.value, price: parseFloat(price.value), discount: parseFloat(discount.value||0)||0, quantity: parseInt(quantity.value||0), category: category.value, is_premium: is_premium.value==='1', enable_today: enable_today.value==='1' }; try { const r = await fetchJSON('/vendor/products/'+id,{ method:'PUT', body: JSON.stringify(payload) }); if(!r.success) throw new Error(r.error||'Update failed'); status.textContent='Saved successfully'; setTimeout(()=>{ window.location.href='/vendor/products-page'; }, 800); } catch(err){ status.textContent=err.message; }
+  }
+  document.getElementById('editForm').addEventListener('submit', save);
+  document.getElementById('cancelBtn').addEventListener('click', ()=>window.location.href='/vendor/products-page');
+  load();
+</script>
+</body>
+</html>

@@ -23,6 +23,11 @@ Grabrush now supports both customer food discovery and vendor management of prod
 - Create mystery boxes composed of selected products with quantities (transaction + batch insert)
 - View recent orders with inline status updates (in_progress → ready → completed)
 - View product and mystery box listings
+ - Edit & delete existing products (inline updates)
+ - Unified catalog endpoint with filter modes (all, premium, discounted, mystery)
+ - Schedule time‑bound product discount offers (fixed price or percentage)
+ - List scheduled offers with original vs discounted pricing metadata
+ - Account summary dashboard (aggregate stats: total orders, monthly earnings, pending orders)
 
 ### Technical / Platform
 - MySQL relational schema with tables: users, vendors, products, mystery_boxes, mystery_box_items, orders
@@ -70,11 +75,14 @@ src/
 7. Logging centralized via `logger.js` (replace ad-hoc `console.log`).
 
 ## Database Initialization Flow
-`initDatabase()` (in `src/bootstrap.js`) executes CREATE TABLE IF NOT EXISTS statements plus lenient ALTERs (wrapped in try/catch) so repeated launches are safe. If you add a new table or column:
+`initDatabase()` (in `src/bootstrap.js`) executes CREATE TABLE IF NOT EXISTS for base tables, then uses INFORMATION_SCHEMA introspection to add missing columns or relax NOT NULL constraints safely:
 
-1. Add the DDL / ALTER to `bootstrap.js`.
-2. Keep ALTERs idempotent (ignore duplicate errors).
-3. Restart the server – schema adjusts automatically.
+1. Helper functions `columnExists()` and `ensureColumn()` guard each ALTER so duplicate column errors are eliminated.
+2. `ensureModifyNullable()` adjusts existing columns to allow NULL when needed without throwing on repeated runs.
+3. This approach avoids noisy duplicate column errors and prepared statement issues that arose with earlier SHOW COLUMNS patterns.
+4. Add new schema changes by appending CREATE / ALTER guarded by these helpers; restart to apply.
+
+Result: Launches are idempotent, producing clean logs even after multiple restarts.
 
 ## Adding a New Route / Feature
 
@@ -130,6 +138,8 @@ router.use('/', orderHistoryRoutes);
 | 403 on vendor endpoints | Logged in as customer | Login with vendor account or ensure registration set `userType=vendor` |
 | Rate limit errors | Too many rapid requests | Adjust limits in `app.js` (loginLimiter / vendorApiLimiter) |
 | CORS issues (future APIs) | Access from different origin | Add and configure `cors` middleware |
+| Prepared statement error with `LIMIT ?` | MySQL version / driver quirk | Inline validated numeric LIMIT (e.g. clamp and string interpolate) instead of placeholder |
+| Scheduled offer insert fails (undefined new_price) | Missing normalization of discount fields | Ensure `discount_type` + numeric field provided; empty strings → null; supply required new_price or discount_percentage based on type |
 
 ## Logging
 Use `logger.info('message')`, `logger.error(err)` instead of `console.log`. Output is timestamped & colorized for dev; JSON structure supports future log aggregation.
@@ -264,11 +274,17 @@ Base: `http://localhost:9000`
 |--------|----------|-------------|
 | POST | /vendor/products | Create product |
 | GET  | /vendor/products | List vendor products |
+| PUT  | /vendor/products/:id | Update product fields |
+| DELETE | /vendor/products/:id | Delete a product |
+| GET  | /vendor/catalog?filter=premium | Unified catalog (products + mystery boxes) with optional filter (all|premium|discounted|mystery) |
 | POST | /vendor/mystery-boxes | Create mystery box (transaction + batch insert) |
 | GET  | /vendor/mystery-boxes | List vendor mystery boxes |
 | GET  | /vendor/dashboard/metrics | Dashboard metrics (today, ready, completed) |
-| GET  | /vendor/orders?limit=20 | Recent orders with item/mystery box details |
+| GET  | /vendor/orders?limit=20 | Recent orders (LIMIT inlined & validated) |
 | PUT  | /vendor/orders/:id/status | Update order status (in_progress, ready, completed) |
+| POST | /vendor/scheduled-offers | Batch create scheduled product discount offers |
+| GET  | /vendor/scheduled-offers | List scheduled offers with product info |
+| GET  | /vendor/account/summary | Vendor profile + aggregate stats |
 
 ### Product Create Request Body
 ```json
@@ -305,6 +321,92 @@ Base: `http://localhost:9000`
 ```
 
 ### Example Metrics Response
+### Scheduled Offers Request Body
+Batch endpoint accepts an array of offers; each offer defines date/time window and a discount model:
+```json
+{
+  "offers": [
+    {
+      "product_id": 42,
+      "offer_date": "2025-11-10",
+      "offer_start_time": "15:00",
+      "offer_end_time": "18:00",
+      "discount_enabled": true,
+      "discount_type": "fixed_price",
+      "new_price": 5.50,
+      "is_recurring": false
+    },
+    {
+      "product_id": 43,
+      "offer_date": "2025-11-10",
+      "offer_start_time": "09:00",
+      "offer_end_time": "11:00",
+      "discount_enabled": true,
+      "discount_type": "percentage",
+      "discount_percentage": 20,
+      "is_recurring": true
+    }
+  ]
+}
+```
+Rules:
+* Provide `new_price` when `discount_type` = fixed_price.
+* Provide `discount_percentage` (0–100) when `discount_type` = percentage.
+* Empty or missing optional fields are normalized to `null` server-side to keep inserts stable.
+
+### Scheduled Offers List Response (Example)
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 7,
+      "vendor_id": 3,
+      "product_id": 42,
+      "offer_date": "2025-11-10",
+      "offer_start_time": "15:00:00",
+      "offer_end_time": "18:00:00",
+      "discount_enabled": 1,
+      "discount_type": "fixed_price",
+      "new_price": 5.50,
+      "discount_percentage": null,
+      "is_recurring": 0,
+      "product_name": "Chicken Wrap",
+      "original_price": 8.99
+    }
+  ]
+}
+```
+
+### Account Summary Response (Example)
+```json
+{
+  "success": true,
+  "data": {
+    "vendor": {
+      "id": 3,
+      "business_name": "Tasty Bites",
+      "email": "vendor@example.com",
+      "location": "Downtown",
+      "business_contact": "555-1234"
+    },
+    "stats": {
+      "totalOrders": 120,
+      "monthlyEarnings": 1540.25,
+      "pendingOrders": 6
+    }
+  }
+}
+```
+
+### Unified Catalog Filtering
+`GET /vendor/catalog?filter=discounted`
+Filters:
+* `all` (default) – every product & mystery box.
+* `premium` – products with `is_premium = true`.
+* `discounted` – products where `discount > 0`.
+* `mystery` – only mystery boxes.
+
 ```json
 {
   "success": true,
@@ -325,6 +427,7 @@ products(id, vendor_id FK, image_url, name, description, category, quantity, pri
 mystery_boxes(id, vendor_id FK, title, price, quantity, pickup_start_time, pickup_end_time, created_at, updated_at)
 mystery_box_items(id, mystery_box_id FK, product_id FK, quantity, created_at)
 orders(id, vendor_id FK, user_id FK, mystery_box_id FK NULL, product_id FK NULL, order_type ENUM('product','mystery_box'), price, description, pickup_start_time, pickup_end_time, status ENUM('in_progress','ready','completed'), created_at, updated_at)
+scheduled_offers(id, vendor_id FK, product_id FK, offer_date DATE, offer_start_time TIME, offer_end_time TIME, discount_enabled BOOL, discount_type ENUM('fixed_price','percentage'), new_price DECIMAL NULL, discount_percentage DECIMAL NULL, is_recurring BOOL, created_at, updated_at)
 ```
 
 ## Development Tips

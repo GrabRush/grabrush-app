@@ -20,17 +20,41 @@ async function initDatabase() {
   )`);
   logger.info('Users table ensured');
 
-  const userAlterQueries = [
-    'ALTER TABLE users MODIFY COLUMN name VARCHAR(100) NULL',
-    'ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NULL',
-    'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE',
-    'ALTER TABLE users ADD COLUMN verification_token VARCHAR(255)',
-    'ALTER TABLE users ADD COLUMN favorites TEXT NULL',
-    'ALTER TABLE users ADD COLUMN cart TEXT NULL'
-  ];
-  for (const q of userAlterQueries) {
-    try { await executeQuery(q); } catch (e) { /* ignore duplicate/exists */ }
+  // Idempotent column additions (MySQL pre-8 lacks IF NOT EXISTS for MODIFY ADD multiple times)
+  // Use INFORMATION_SCHEMA to avoid parameter placeholder issues with SHOW COLUMNS
+  async function columnExists(table, column) {
+    const q = `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`;
+    const check = await executeQuery(q, [table, column]);
+    return check.success && check.data.length === 1;
   }
+  async function getIsNullable(table, column) {
+    const q = `SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`;
+    const check = await executeQuery(q, [table, column]);
+    if(check.success && check.data.length === 1) return check.data[0].IS_NULLABLE; // 'YES' | 'NO'
+    return null;
+  }
+  async function ensureColumn(table, column, definition){
+    const exists = await columnExists(table, column);
+    if(!exists){
+      await executeQuery(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+      logger.info(`Added column ${table}.${column}`);
+    }
+  }
+  async function ensureModifyNullable(table, column, type){
+    const exists = await columnExists(table, column);
+    if(!exists) return; // nothing to modify yet
+    const nullable = await getIsNullable(table, column);
+    if(nullable === 'NO'){
+      await executeQuery(`ALTER TABLE ${table} MODIFY COLUMN ${column} ${type} NULL`);
+      logger.info(`Modified column ${table}.${column} to NULLABLE`);
+    }
+  }
+  await ensureModifyNullable('users','name','VARCHAR(100)');
+  await ensureModifyNullable('users','password','VARCHAR(255)');
+  await ensureColumn('users','is_verified','is_verified BOOLEAN DEFAULT FALSE');
+  await ensureColumn('users','verification_token','verification_token VARCHAR(255)');
+  await ensureColumn('users','favorites','favorites TEXT NULL');
+  await ensureColumn('users','cart','cart TEXT NULL');
 
   // Vendors table
   await executeQuery(`CREATE TABLE IF NOT EXISTS vendors (
@@ -46,17 +70,12 @@ async function initDatabase() {
   )`);
   logger.info('Vendors table ensured');
 
-  const vendorAlterQueries = [
-    'ALTER TABLE vendors MODIFY COLUMN business_name VARCHAR(200) NULL',
-    'ALTER TABLE vendors MODIFY COLUMN password VARCHAR(255) NULL',
-    'ALTER TABLE vendors MODIFY COLUMN location VARCHAR(200) NULL',
-    'ALTER TABLE vendors MODIFY COLUMN business_contact VARCHAR(20) NULL',
-    'ALTER TABLE vendors ADD COLUMN is_verified BOOLEAN DEFAULT FALSE',
-    'ALTER TABLE vendors ADD COLUMN verification_token VARCHAR(255)'
-  ];
-  for (const q of vendorAlterQueries) {
-    try { await executeQuery(q); } catch (e) { /* ignore */ }
-  }
+  await ensureModifyNullable('vendors','business_name','VARCHAR(200)');
+  await ensureModifyNullable('vendors','password','VARCHAR(255)');
+  await ensureModifyNullable('vendors','location','VARCHAR(200)');
+  await ensureModifyNullable('vendors','business_contact','VARCHAR(20)');
+  await ensureColumn('vendors','is_verified','is_verified BOOLEAN DEFAULT FALSE');
+  await ensureColumn('vendors','verification_token','verification_token VARCHAR(255)');
 
   // Products table
   await executeQuery(`CREATE TABLE IF NOT EXISTS products (
@@ -127,6 +146,26 @@ async function initDatabase() {
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
   )`);
   logger.info('Orders table ensured');
+
+  // Scheduled offers table
+  await executeQuery(`CREATE TABLE IF NOT EXISTS scheduled_offers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vendor_id INT NOT NULL,
+    product_id INT NOT NULL,
+    offer_date DATE NOT NULL,
+    offer_start_time TIME NOT NULL,
+    offer_end_time TIME NOT NULL,
+    discount_enabled BOOLEAN DEFAULT TRUE,
+    discount_type ENUM('fixed_price','percentage') DEFAULT 'fixed_price',
+    new_price DECIMAL(10,2) NULL,
+    discount_percentage DECIMAL(5,2) NULL,
+    is_recurring BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  )`);
+  logger.info('Scheduled offers table ensured');
 }
 
 module.exports = { initDatabase };

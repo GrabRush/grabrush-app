@@ -6,122 +6,308 @@
   <title>Vendor Dashboard - Grabrush</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
-    .dashboard-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
-    .metrics { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-    .metric-card { flex: 1 1 200px; background:#fff; border-radius:8px; padding:16px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
-    .metric-value { font-size:32px; font-weight:700; margin-top:4px; }
-    .actions { display:flex; gap:12px; margin-bottom:24px; }
-    .actions a { background:#4CAF50; color:#fff; padding:12px 18px; border-radius:6px; text-decoration:none; font-weight:600; }
-    .actions a.secondary { background:#1976d2; }
-    .section-title { font-size:20px; margin:28px 0 12px; font-weight:600; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:10px 8px; text-align:left; border-bottom:1px solid #eee; }
-    th { background:#fafafa; font-weight:600; }
-    .status-pill { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
-    .status-in_progress { background:#ffe082; }
-    .status-ready { background:#81c784; color:#1b5e20; }
-    .status-completed { background:#90a4ae; color:#263238; }
-    .product-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
-    .product-card { background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:12px; display:flex; flex-direction:column; }
-    .product-card img { width:100%; height:140px; object-fit:cover; border-radius:6px; }
-    .product-name { font-weight:600; margin:8px 0 4px; }
-    .product-meta { font-size:12px; color:#555; }
-    .logout-form { margin-left:auto; }
-    .top-bar { display:flex; align-items:center; gap:16px; margin-bottom:24px; }
-    .refresh-btn { background:#555; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; }
-    .inline-btn { background:#1976d2; color:#fff; border:none; padding:6px 10px; border-radius:4px; font-size:12px; cursor:pointer; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f5f5f5; }
+    .dashboard-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    
+    /* Top Bar */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .top-bar-left { display: flex; align-items: center; gap: 16px; }
+    .top-bar h1 { margin: 0; font-size: 24px; font-weight: 600; color: #333; }
+    .notification-bell { position: relative; background: none; border: none; cursor: pointer; padding: 8px; }
+    .notification-bell svg { width: 24px; height: 24px; color: #333; }
+    .notification-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; }
+    .logout-form { margin-left: auto; }
+    .logout-button { background: #555; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    
+    /* Metrics Cards */
+    .metrics { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .metric-card { flex: 1 1 200px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); min-width: 180px; }
+    .metric-label { font-size: 14px; color: #666; margin-bottom: 8px; }
+    .metric-value { font-size: 36px; font-weight: 700; margin: 0; }
+    .metric-value.today { color: #4CAF50; }
+    .metric-value.ready { color: #FF9800; }
+    .metric-value.completed { color: #4CAF50; }
+    
+    /* Mystery Box Toggle Card */
+    .mystery-box-toggle-card { background: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: space-between; }
+    .mystery-box-toggle-left { display: flex; align-items: center; gap: 12px; }
+    .mystery-box-icon { width: 32px; height: 32px; color: #4CAF50; }
+    .mystery-box-toggle-text h3 { margin: 0; font-size: 16px; font-weight: 600; color: #333; }
+    .mystery-box-toggle-text p { margin: 2px 0 0 0; font-size: 12px; color: #666; }
+    .toggle-switch { position: relative; width: 48px; height: 28px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    .toggle-switch input:checked + .toggle-slider { background-color: #4CAF50; }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+    
+    /* Quick Actions */
+    .section-title { font-size: 18px; font-weight: 600; margin: 28px 0 16px; color: #333; }
+    .quick-actions { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .action-btn { flex: 1 1 200px; background: #4CAF50; color: #fff; padding: 14px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer; font-size: 14px; }
+    .action-btn.secondary { background: #4CAF50; }
+    .action-btn svg { width: 18px; height: 18px; }
+    
+    /* Setup Mystery Box Card */
+    .setup-mystery-box-card { background: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 16px; border-left: 4px solid #FF9800; }
+    .setup-mystery-box-icon { width: 32px; height: 32px; color: #FF9800; }
+    .setup-mystery-box-text h3 { margin: 0; font-size: 16px; font-weight: 600; color: #333; }
+    .setup-mystery-box-text p { margin: 2px 0 0 0; font-size: 12px; color: #666; }
+    
+    /* Recent Orders */
+    .orders-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .order-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: flex-start; }
+    .order-left { flex: 1; }
+    .order-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .order-icon { width: 20px; height: 20px; color: #666; }
+    .order-title { font-size: 16px; font-weight: 600; color: #333; margin: 0 0 4px 0; }
+    .order-details { font-size: 14px; color: #666; margin: 4px 0; }
+    .order-pickup { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #FF9800; margin-top: 8px; }
+    .order-pickup svg { width: 14px; height: 14px; }
+    .order-right { text-align: right; }
+    .order-price { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 8px; }
+    .order-status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .order-status.ready { background: #FFE082; color: #E65100; }
+    .order-status.done { background: #C8E6C9; color: #2E7D32; }
+    .order-status.in_progress { background: #E0E0E0; color: #424242; }
+    
+    .view-all-orders { text-align: center; margin: 20px 0; }
+    .view-all-orders a { color: #4CAF50; text-decoration: none; font-weight: 600; font-size: 14px; }
+    
+    /* Hidden sections */
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="dashboard-container">
+    <!-- Top Bar -->
     <div class="top-bar">
-      <h1 style="margin:0; font-size:28px;">Vendor Dashboard</h1>
-      <button class="refresh-btn" id="refreshAll">Refresh</button>
-      <form action="/logout" method="POST" class="logout-form"><button type="submit" class="logout-button" style="padding:8px 16px;">Logout</button></form>
+      <div class="top-bar-left">
+        <h1>Dashboard</h1>
+        <button class="notification-bell" id="notificationBell">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notification-dot"></span>
+        </button>
+      </div>
+      <form action="/logout" method="POST" class="logout-form">
+        <button type="submit" class="logout-button">Logout</button>
+      </form>
     </div>
 
+    <!-- Metrics Cards -->
     <div class="metrics" id="metrics">
-      <div class="metric-card"><div>Today's Orders</div><div class="metric-value" id="metric-today">0</div></div>
-      <div class="metric-card"><div>Ready for Pickup</div><div class="metric-value" id="metric-ready">0</div></div>
-      <div class="metric-card"><div>Completed</div><div class="metric-value" id="metric-completed">0</div></div>
+      <div class="metric-card">
+        <div class="metric-label">Today's Orders</div>
+        <div class="metric-value today" id="metric-today">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Ready for Pickup</div>
+        <div class="metric-value ready" id="metric-ready">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Completed</div>
+        <div class="metric-value completed" id="metric-completed">0</div>
+      </div>
     </div>
 
-    <div class="actions">
-      <a href="/vendor/products/new">Add New Product</a>
-      <a href="/vendor/mystery-boxes/new" class="secondary">Setup a Mystery Box</a>
+    <!-- Mystery Box Toggle Card -->
+    <div class="mystery-box-toggle-card">
+      <div class="mystery-box-toggle-left">
+        <svg class="mystery-box-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <div class="mystery-box-toggle-text">
+          <h3>Mystery Box</h3>
+          <p id="mysteryBoxStatus">Live & accepting orders</p>
+        </div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="mysteryBoxToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
     </div>
 
+    <!-- Quick Actions -->
+    <div class="section-title">Quick Actions</div>
+    <div class="quick-actions">
+      <a href="/vendor/products/new" class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Add New Product
+      </a>
+      <a href="/vendor/schedule-offer" class="action-btn secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        Schedule an offer
+      </a>
+    </div>
+
+    <!-- Setup Mystery Box Card -->
+    <div class="setup-mystery-box-card">
+      <svg class="setup-mystery-box-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <div class="setup-mystery-box-text">
+        <h3>Setup Mystery Box</h3>
+        <p>Create surprise deals</p>
+      </div>
+      <a href="/vendor/mystery-boxes/new" style="margin-left: auto; color: #FF9800; text-decoration: none; font-weight: 600; font-size: 14px;">→</a>
+    </div>
+
+    <!-- Recent Orders -->
     <div class="section-title">Recent Orders</div>
-    <div style="overflow-x:auto;">
-      <table id="orders-table">
-        <thead><tr><th>ID</th><th>Item</th><th>Type</th><th>Price</th><th>Pickup Window</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <div class="orders-list" id="orders-list"></div>
+    <div class="view-all-orders">
+      <a href="/vendor/orders-page" id="viewAllOrders">View All Orders</a>
     </div>
-
-    <div class="section-title">Products</div>
-    <div class="product-list" id="product-list"></div>
-
-    <div class="section-title">Mystery Boxes</div>
-    <div class="product-list" id="box-list"></div>
   </div>
 
   <script>
-    async function fetchJSON(url, options={}) { const res = await fetch(url, options); if(!res.ok){ throw new Error('Request failed: '+res.status); } return res.json(); }
-    function formatDateTime(dt){ if(!dt) return ''; const d=new Date(dt); return d.toLocaleString(); }
+    async function fetchJSON(url, options={}) { 
+      const res = await fetch(url, options); 
+      if(!res.ok){ throw new Error('Request failed: '+res.status); } 
+      return res.json(); 
+    }
+    
+    function formatTime(dt){ 
+      if(!dt) return ''; 
+      const d = new Date(dt); 
+      const hours = d.getHours();
+      const minutes = d.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
+      return `${displayHours}:${displayMinutes} ${ampm}`;
+    }
+    
+    function formatPickupWindow(start, end) {
+      if (!start || !end) return '';
+      return `${formatTime(start)}-${formatTime(end)}`;
+    }
 
     async function loadMetrics(){
-      try { const data = await fetchJSON('/vendor/dashboard/metrics'); if(data.success){
-        document.getElementById('metric-today').textContent = data.data.todaysOrders;
-        document.getElementById('metric-ready').textContent = data.data.readyOrders;
-        document.getElementById('metric-completed').textContent = data.data.completedOrders;
-      }} catch(e){ console.error(e); }
+      try { 
+        const data = await fetchJSON('/vendor/dashboard/metrics'); 
+        if(data.success){
+          document.getElementById('metric-today').textContent = data.data.todaysOrders;
+          document.getElementById('metric-ready').textContent = data.data.readyOrders;
+          document.getElementById('metric-completed').textContent = data.data.completedOrders;
+        }
+      } catch(e){ console.error(e); }
     }
 
     async function loadOrders(){
-      try { const data = await fetchJSON('/vendor/orders?limit=20'); const tbody = document.querySelector('#orders-table tbody'); tbody.innerHTML='';
-        if(data.success){ data.data.forEach(o => {
-          const tr=document.createElement('tr');
-          const pickup = o.pickup_start_time ? (formatDateTime(o.pickup_start_time)+' - '+formatDateTime(o.pickup_end_time)) : '';
-          tr.innerHTML = `<td>${o.id}</td><td>${o.item_title || ''}</td><td>${o.order_type}</td><td>$${Number(o.price).toFixed(2)}</td><td>${pickup}</td><td><span class="status-pill status-${o.status}">${o.status.replace('_',' ')}</span></td><td><button class='inline-btn' data-id='${o.id}' data-status='ready'>Mark Ready</button> <button class='inline-btn' data-id='${o.id}' data-status='completed'>Complete</button></td>`;
-          tbody.appendChild(tr);
-        }); }
+      try { 
+        const data = await fetchJSON('/vendor/orders?limit=10'); 
+        const list = document.getElementById('orders-list'); 
+        list.innerHTML = '';
+        if(data.success && data.data.length > 0){ 
+          data.data.forEach(o => {
+            const orderCard = document.createElement('div');
+            orderCard.className = 'order-card';
+            
+            const orderType = o.order_type === 'mystery_box' ? 'Mystery Meal' : o.item_title || 'Product';
+            const orderDetails = o.order_type === 'mystery_box' 
+              ? (o.mystery_box_product_names || 'Mystery Box')
+              : (o.description || o.item_title || '');
+            
+            const pickupWindow = formatPickupWindow(o.pickup_start_time, o.pickup_end_time);
+            const statusClass = o.status === 'ready' ? 'ready' : o.status === 'completed' ? 'done' : 'in_progress';
+            const statusText = o.status === 'ready' ? 'Ready' : o.status === 'completed' ? 'Done' : 'In Progress';
+            
+            orderCard.innerHTML = `
+              <div class="order-left">
+                <div class="order-header">
+                  <svg class="order-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                  </svg>
+                  <span style="font-size: 12px; color: #666;">${orderType}</span>
+                </div>
+                <div class="order-title">Order #${o.id}</div>
+                <div class="order-details">${orderDetails}</div>
+                ${pickupWindow ? `
+                  <div class="order-pickup">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Pickup: ${pickupWindow}
+                  </div>
+                ` : ''}
+              </div>
+              <div class="order-right">
+                <div class="order-price">$${Number(o.price).toFixed(2)}</div>
+                <span class="order-status ${statusClass}">${statusText}</span>
+              </div>
+            `;
+            list.appendChild(orderCard);
+          }); 
+        } else {
+          list.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No recent orders</div>';
+        }
       } catch(e){ console.error(e); }
     }
 
-    async function loadProducts(){
-      try { const data = await fetchJSON('/vendor/products'); const list = document.getElementById('product-list'); list.innerHTML='';
-        if(data.success){ data.data.forEach(p => {
-          const div=document.createElement('div'); div.className='product-card';
-          div.innerHTML = `<img src='${p.image_url || 'https://via.placeholder.com/300x180?text=No+Image'}' alt='${p.name}'/><div class='product-name'>${p.name}</div><div class='product-meta'>Qty: ${p.quantity} | $${Number(p.price).toFixed(2)}${p.discount? ' (-'+p.discount+')':''}</div>`;
-          list.appendChild(div);
-        }); }
-      } catch(e){ console.error(e); }
-    }
-
-    async function loadBoxes(){
-      try { const data = await fetchJSON('/vendor/mystery-boxes'); const list = document.getElementById('box-list'); list.innerHTML='';
-        if(data.success){ data.data.forEach(b => {
-          const div=document.createElement('div'); div.className='product-card';
-          div.innerHTML = `<div style='height:140px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;border-radius:6px;font-weight:600;'>Mystery Box</div><div class='product-name'>${b.title || 'Untitled Box'}</div><div class='product-meta'>Items: ${b.item_count} | Qty: ${b.quantity} | $${Number(b.price).toFixed(2)}</div>`;
-          list.appendChild(div);
-        }); }
-      } catch(e){ console.error(e); }
-    }
-
-    document.getElementById('refreshAll').addEventListener('click', () => {
-      loadMetrics(); loadOrders(); loadProducts(); loadBoxes();
+    // Mystery Box Toggle
+    const mysteryBoxToggle = document.getElementById('mysteryBoxToggle');
+    const mysteryBoxStatus = document.getElementById('mysteryBoxStatus');
+    
+    mysteryBoxToggle.addEventListener('change', async (e) => {
+      const isEnabled = e.target.checked;
+      mysteryBoxStatus.textContent = isEnabled ? 'Live & accepting orders' : 'Offline';
+      // TODO: Add API call to update mystery box status
+      // await fetchJSON('/vendor/mystery-boxes/toggle', { method: 'PUT', body: JSON.stringify({ enabled: isEnabled }) });
     });
 
-    document.querySelector('#orders-table').addEventListener('click', async (e) => {
-      if(e.target.matches('button.inline-btn')){
-        const id=e.target.getAttribute('data-id'); const status=e.target.getAttribute('data-status');
-        try { const res = await fetch(`/vendor/orders/${id}/status`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status })}); const j=await res.json(); if(j.success){ loadOrders(); loadMetrics(); } } catch(err){ console.error(err); }
-      }
-    });
+
+    // Bottom nav highlighting
+    function highlightNav(){
+      const path = window.location.pathname;
+      document.querySelectorAll('.bottom-nav .nav-item').forEach(a => {
+        if(path.startsWith(a.getAttribute('href'))){ a.classList.add('active'); }
+        else { a.classList.remove('active'); }
+      });
+    }
+    highlightNav();
 
     // Initial load
-    loadMetrics(); loadOrders(); loadProducts(); loadBoxes();
+    loadMetrics();
+    loadOrders();
+    
+    // Refresh on notification bell click
+    document.getElementById('notificationBell').addEventListener('click', () => {
+      loadMetrics();
+      loadOrders();
+    });
   </script>
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="/vendor/dashboard" class="nav-item active" data-nav="home"><span>Home</span></a>
+    <a href="/vendor/orders-page" class="nav-item" data-nav="orders"><span>Orders</span></a>
+    <a href="/vendor/products-page" class="nav-item" data-nav="products"><span>Products</span></a>
+    <a href="/vendor/account" class="nav-item" data-nav="account"><span>Account</span></a>
+  </nav>
+  <style>
+    /* Unified bottom navigation (left-aligned, larger) */
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 2px solid #d0d0d0; height: 64px; box-shadow: 0 -2px 6px rgba(0,0,0,0.08); z-index: 100; padding: 0 8px; }
+    .bottom-nav .nav-item { flex: 1; text-align: left; text-decoration: none; font-size: 14px; color: #444; display: flex; flex-direction: row; gap: 8px; padding: 0 12px; align-items: center; font-weight: 600; border-right: 1px solid #eee; }
+    .bottom-nav .nav-item:last-child { border-right: none; }
+    .bottom-nav .nav-item span { line-height: 1; }
+    .bottom-nav .nav-item.active { color: #2e7d32; background: #e8f5e9; border-radius: 8px; }
+    body { padding-bottom: 84px; }
+  </style>
 </body>
 </html>

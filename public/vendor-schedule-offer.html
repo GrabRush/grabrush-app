@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedule Offer - Grabrush</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    
+    .header { margin-bottom: 24px; }
+    .header h1 { margin: 0 0 16px 0; font-size: 20px; font-weight: 600; color: #333; }
+    
+    .back-link { display: inline-block; margin-bottom: 16px; color: #4CAF50; text-decoration: none; font-weight: 500; }
+    
+    .select-product-section { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .select-product-section label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+    .select-product-section select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; }
+    
+    .product-cards { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+    .product-card { background: #f9f9f9; border-radius: 12px; padding: 16px; position: relative; }
+    .product-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .product-card-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #333; }
+    .remove-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 20px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+    .remove-btn:hover { color: #333; }
+    
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .form-group input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .form-group input[type="date"] { position: relative; }
+    .form-group input[type="time"] { position: relative; }
+    .input-with-icon { position: relative; }
+    .input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: #666; pointer-events: none; }
+    .input-with-icon input { padding-left: 36px; }
+    
+    .toggle-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 12px 0; }
+    .toggle-group label { font-size: 14px; font-weight: 600; color: #333; margin: 0; }
+    .toggle-switch { position: relative; width: 48px; height: 28px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    .toggle-switch input:checked + .toggle-slider { background-color: #4CAF50; }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+    .toggle-switch.orange input:checked + .toggle-slider { background-color: #FF9800; }
+    
+    .discount-input-group { margin-bottom: 16px; }
+    .discount-input-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    
+    .savings-banner { background: #FF9800; color: #fff; padding: 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+    .savings-banner .savings-amount { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .savings-banner .savings-text { font-size: 14px; opacity: 0.9; }
+    
+    .recurring-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0; }
+    .recurring-description { font-size: 12px; color: #666; margin-top: 8px; }
+    
+    .schedule-btn { width: 100%; background: #4CAF50; color: #fff; border: none; padding: 16px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 24px; }
+    .schedule-btn:hover { background: #45a049; }
+    .schedule-btn:disabled { background: #ccc; cursor: not-allowed; }
+    
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/vendor/dashboard" class="back-link">← Back to Dashboard</a>
+      <h1>Select Product</h1>
+    </div>
+    
+    <div class="select-product-section">
+      <label for="productSelect">Select Item</label>
+      <select id="productSelect">
+        <option value="">-- Select a product --</option>
+      </select>
+    </div>
+    
+    <div class="product-cards" id="productCards">
+      <div class="empty-state">No products selected. Select a product from the dropdown above to schedule an offer.</div>
+    </div>
+    
+    <button class="schedule-btn" id="scheduleBtn" disabled>Schedule</button>
+  </div>
+
+  <script>
+    const selectedProducts = new Map(); // productId -> product data
+    
+    async function fetchJSON(url, options={}) {
+      const res = await fetch(url, options);
+      if(!res.ok) throw new Error('Request failed: ' + res.status);
+      return res.json();
+    }
+    
+    async function loadProducts() {
+      try {
+        const data = await fetchJSON('/vendor/products');
+        const select = document.getElementById('productSelect');
+        select.innerHTML = '<option value="">-- Select a product --</option>';
+        if(data.success) {
+          data.data.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = p.name;
+            option.dataset.product = JSON.stringify(p);
+            select.appendChild(option);
+          });
+        }
+      } catch(e) {
+        console.error('Failed to load products:', e);
+      }
+    }
+    
+    function formatDate(dateStr) {
+      if(!dateStr) return '';
+      const d = new Date(dateStr);
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${month}/${day}/${year}`;
+    }
+    
+    function formatTimeRange(start, end) {
+      if(!start || !end) return '';
+      const formatTime = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':');
+        const h = parseInt(hours);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 || 12;
+        return `${displayH}${minutes !== '00' ? ':' + minutes : ''} ${ampm}`;
+      };
+      return `${formatTime(start)} - ${formatTime(end)}`;
+    }
+    
+    function calculateSavings(product, discountType, newPrice, discountPercent) {
+      const originalPrice = parseFloat(product.price);
+      let savings = 0;
+      let savingsText = '';
+      let savingsPercent = 0;
+      
+      if(discountType === 'fixed_price' && newPrice) {
+        savings = originalPrice - parseFloat(newPrice);
+        savingsPercent = Math.round((savings / originalPrice) * 100);
+        savingsText = `${savingsPercent}% OFF`;
+      } else if(discountType === 'percentage' && discountPercent) {
+        savings = originalPrice * (parseFloat(discountPercent) / 100);
+        savingsPercent = parseFloat(discountPercent);
+        savingsText = `$${savings.toFixed(2)} OFF`;
+      }
+      
+      return { savings, savingsText, savingsPercent };
+    }
+    
+    function renderProductCard(productId, product) {
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.dataset.productId = productId;
+      
+      const defaultDate = new Date();
+      defaultDate.setDate(defaultDate.getDate() + 7);
+      const defaultDateStr = defaultDate.toISOString().split('T')[0];
+      
+      card.innerHTML = `
+        <div class="product-card-header">
+          <h3>${product.name}</h3>
+          <button class="remove-btn" onclick="removeProduct(${productId})">×</button>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Select a Date</label>
+            <div class="input-with-icon">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              <input type="date" class="offer-date" value="${defaultDateStr}" onchange="updateProduct(${productId})">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Select a Time</label>
+            <div>
+              <input type="time" class="offer-start-time" value="20:00" onchange="updateProduct(${productId})" style="margin-bottom: 8px;">
+              <input type="time" class="offer-end-time" value="21:00" onchange="updateProduct(${productId})">
+            </div>
+          </div>
+        </div>
+        
+        <div class="toggle-group">
+          <label>Discounted Pricing</label>
+          <label class="toggle-switch ${product.discountType === 'percentage' ? 'orange' : ''}">
+            <input type="checkbox" class="discount-enabled" ${product.discountEnabled !== false ? 'checked' : ''} onchange="toggleDiscount(${productId})">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="discount-input-group" style="display: ${product.discountEnabled !== false ? 'block' : 'none'};">
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <button type="button" class="discount-type-btn ${product.discountType === 'fixed_price' ? 'active' : ''}" onclick="setDiscountType(${productId}, 'fixed_price')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: ${product.discountType === 'fixed_price' ? '#4CAF50' : '#fff'}; color: ${product.discountType === 'fixed_price' ? '#fff' : '#333'}; cursor: pointer;">Fixed Price</button>
+            <button type="button" class="discount-type-btn ${product.discountType === 'percentage' ? 'active' : ''}" onclick="setDiscountType(${productId}, 'percentage')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: ${product.discountType === 'percentage' ? '#FF9800' : '#fff'}; color: ${product.discountType === 'percentage' ? '#fff' : '#333'}; cursor: pointer;">Percentage</button>
+          </div>
+          ${product.discountType === 'percentage' ? `
+            <label>Percentage discount (%)</label>
+            <input type="number" class="discount-percentage" value="${product.discountPercent || ''}" min="0" max="100" step="0.01" placeholder="11" onchange="updateProduct(${productId})">
+          ` : `
+            <div style="font-size:12px; color:#444; font-weight:600; margin-bottom:4px;">Current Price: $${Number(product.price).toFixed(2)}</div>
+            <label>New Price ($)</label>
+            <input type="number" class="new-price" value="${product.newPrice || ''}" min="0" step="0.01" placeholder="40.35" onchange="updateProduct(${productId})">
+          `}
+        </div>
+        
+        <div class="savings-banner" style="display: ${product.discountEnabled !== false && (product.newPrice || product.discountPercent) ? 'block' : 'none'};">
+          <div class="savings-amount" id="savings-amount-${productId}"></div>
+          <div class="savings-text" id="savings-text-${productId}"></div>
+        </div>
+        
+        <div class="recurring-section">
+          <div class="toggle-group">
+            <div>
+              <label>Recurring</label>
+              <div class="recurring-description">This will auto publish every month with current settings.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" class="is-recurring" ${product.isRecurring ? 'checked' : ''} onchange="updateProduct(${productId})">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      `;
+      
+      updateSavingsBanner(productId, product);
+      return card;
+    }
+    
+    function updateSavingsBanner(productId, product) {
+      if(!product.discountEnabled || (!product.newPrice && !product.discountPercent)) {
+        const banner = document.querySelector(`[data-product-id="${productId}"] .savings-banner`);
+        if(banner) banner.style.display = 'none';
+        return;
+      }
+      
+      const savings = calculateSavings(product, product.discountType, product.newPrice, product.discountPercent);
+      const amountEl = document.getElementById(`savings-amount-${productId}`);
+      const textEl = document.getElementById(`savings-text-${productId}`);
+      
+      if(amountEl && textEl) {
+        if(product.discountType === 'percentage') {
+          amountEl.textContent = savings.savingsText;
+          textEl.textContent = `Customers save ${product.discountPercent}%`;
+        } else {
+          amountEl.textContent = savings.savingsText;
+          textEl.textContent = `Customers save $${savings.savings.toFixed(2)}`;
+        }
+        document.querySelector(`[data-product-id="${productId}"] .savings-banner`).style.display = 'block';
+      }
+    }
+    
+    function toggleDiscount(productId) {
+      const card = document.querySelector(`[data-product-id="${productId}"]`);
+      if(!card) return;
+      
+      const product = selectedProducts.get(productId);
+      product.discountEnabled = card.querySelector('.discount-enabled').checked;
+      
+      const discountInputGroup = card.querySelector('.discount-input-group');
+      if(product.discountEnabled) {
+        discountInputGroup.style.display = 'block';
+      } else {
+        discountInputGroup.style.display = 'none';
+      }
+      
+      updateSavingsBanner(productId, product);
+    }
+    
+    function setDiscountType(productId, type) {
+      const product = selectedProducts.get(productId);
+      product.discountType = type;
+      if(type === 'percentage') {
+        product.newPrice = null;
+      } else {
+        product.discountPercent = null;
+      }
+      renderCards();
+    }
+    
+    function updateProduct(productId) {
+      const card = document.querySelector(`[data-product-id="${productId}"]`);
+      if(!card) return;
+      
+      const product = selectedProducts.get(productId);
+      product.offerDate = card.querySelector('.offer-date').value;
+      product.offerStartTime = card.querySelector('.offer-start-time').value;
+      product.offerEndTime = card.querySelector('.offer-end-time').value;
+      product.discountEnabled = card.querySelector('.discount-enabled').checked;
+      product.isRecurring = card.querySelector('.is-recurring').checked;
+      
+      const toggleSwitch = card.querySelector('.discount-enabled').closest('.toggle-switch');
+      
+      if(product.discountType === 'percentage') {
+        product.discountPercent = parseFloat(card.querySelector('.discount-percentage')?.value) || 0;
+        product.newPrice = null;
+        toggleSwitch.classList.add('orange');
+      } else {
+        product.newPrice = parseFloat(card.querySelector('.new-price')?.value) || null;
+        product.discountPercent = null;
+        toggleSwitch.classList.remove('orange');
+      }
+      
+      updateSavingsBanner(productId, product);
+      updateScheduleButton();
+    }
+    
+    function addProduct() {
+      const select = document.getElementById('productSelect');
+      const selectedOption = select.options[select.selectedIndex];
+      if(!selectedOption.value) return;
+      
+      const product = JSON.parse(selectedOption.dataset.product);
+      const productId = product.id;
+      
+      if(selectedProducts.has(productId)) {
+        alert('This product is already added.');
+        return;
+      }
+      
+      selectedProducts.set(productId, {
+        ...product,
+        offerDate: new Date(Date.now()+7*24*60*60*1000).toISOString().split('T')[0],
+        offerStartTime: '20:00',
+        offerEndTime: '21:00',
+        discountEnabled: true,
+        discountType: 'fixed_price',
+        newPrice: null,
+        discountPercent: null,
+        isRecurring: false
+      });
+      
+      renderCards();
+      select.value = '';
+      updateScheduleButton();
+    }
+    
+    function removeProduct(productId) {
+      selectedProducts.delete(productId);
+      renderCards();
+      updateScheduleButton();
+    }
+    
+    function renderCards() {
+      const container = document.getElementById('productCards');
+      container.innerHTML = '';
+      
+      if(selectedProducts.size === 0) {
+        container.innerHTML = '<div class="empty-state">No products selected. Select a product from the dropdown above to schedule an offer.</div>';
+        return;
+      }
+      
+      selectedProducts.forEach((product, productId) => {
+        container.appendChild(renderProductCard(productId, product));
+      });
+    }
+    
+    function updateScheduleButton() {
+      const btn = document.getElementById('scheduleBtn');
+      btn.disabled = selectedProducts.size === 0;
+    }
+    
+    async function scheduleOffers() {
+      if(selectedProducts.size === 0) return;
+      
+      const offers = Array.from(selectedProducts.entries()).map(([productId, product]) => ({
+        product_id: productId,
+        offer_date: product.offerDate,
+        offer_start_time: product.offerStartTime || '20:00',
+        offer_end_time: product.offerEndTime || '21:00',
+        discount_enabled: product.discountEnabled,
+        discount_type: product.discountType,
+        new_price: product.discountType==='fixed_price' ? product.newPrice : null,
+        discount_percentage: product.discountType==='percentage' ? product.discountPercent : null,
+        is_recurring: product.isRecurring
+      }));
+      
+      try {
+        const result = await fetchJSON('/vendor/scheduled-offers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offers })
+        });
+        
+        if(result.success) {
+          alert('Offers scheduled successfully!');
+          window.location.href = '/vendor/dashboard';
+        } else {
+          alert('Failed to schedule offers: ' + (result.error || 'Unknown error'));
+        }
+      } catch(e) {
+        console.error('Error scheduling offers:', e);
+        alert('Failed to schedule offers. Please try again.');
+      }
+    }
+    
+    document.getElementById('productSelect').addEventListener('change', addProduct);
+    document.getElementById('scheduleBtn').addEventListener('click', scheduleOffers);
+    
+    // Make functions globally available
+    window.removeProduct = removeProduct;
+    window.updateProduct = updateProduct;
+    window.toggleDiscount = toggleDiscount;
+    window.setDiscountType = setDiscountType;
+    
+    // Initialize
+    loadProducts();
+  </script>
+</body>
+</html>
+

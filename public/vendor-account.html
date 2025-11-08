@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Account - Vendor</title>
+<link rel="stylesheet" href="/style.css" />
+<style>
+ body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background:#f5f5f5; padding-bottom:70px; }
+ .page { max-width:900px; margin:0 auto; padding:18px 20px 100px; }
+ h1 { font-size:22px; margin:0 0 18px; }
+ .vendor-card { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:22px; }
+ .vendor-card h2 { margin:0 0 8px; font-size:18px; }
+ .info-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+ .info-item { background:#fafafa; padding:12px 14px; border-radius:10px; font-size:12px; }
+ .info-item label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#777; margin-bottom:4px; font-weight:600; }
+ .info-item span { font-size:13px; font-weight:600; color:#333; }
+ .stats { display:flex; gap:14px; flex-wrap:wrap; }
+ .stat-card { flex:1 1 180px; background:#fff; padding:18px 20px; border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+ .stat-card label { display:block; font-size:11px; color:#666; margin-bottom:6px; font-weight:600; }
+ .stat-card .value { font-size:30px; font-weight:700; }
+ .value.earn { color:#4CAF50; }
+ .value.pending { color:#FF9800; }
+ .value.total { color:#333; }
+ .refresh { position:fixed; top:14px; right:14px; background:#4CAF50; border:none; color:#fff; padding:8px 14px; border-radius:20px; font-weight:600; cursor:pointer; font-size:12px; }
+ .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #ddd; height: 56px; box-shadow: 0 -2px 6px rgba(0,0,0,0.06); z-index: 100; }
+ .bottom-nav .nav-item { flex: 1; text-align: center; text-decoration: none; font-size: 12px; color: #555; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 500; }
+ .bottom-nav .nav-item.active { color: #4CAF50; font-weight: 600; }
+ @media (min-width: 900px) { .bottom-nav { max-width: 600px; margin: 0 auto; left: 50%; transform: translateX(-50%); border-radius: 12px 12px 0 0; } }
+</style>
+</head>
+<body>
+  <button class="refresh" id="refreshBtn">Refresh</button>
+  <div class="page">
+    <h1>Account</h1>
+    <div class="vendor-card" id="vendorCard">
+      <h2 id="businessName">Business Name</h2>
+      <div class="info-grid">
+        <div class="info-item"><label>Owner / Contact</label><span id="ownerName">-</span></div>
+        <div class="info-item"><label>Email</label><span id="email">-</span></div>
+        <div class="info-item"><label>Phone</label><span id="phone">-</span></div>
+        <div class="info-item"><label>Address</label><span id="address">-</span></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat-card"><label>Total Orders</label><div class="value total" id="statTotal">0</div></div>
+      <div class="stat-card"><label>Earnings This Month</label><div class="value earn" id="statEarnings">$0.00</div></div>
+      <div class="stat-card"><label>Pending Orders</label><div class="value pending" id="statPending">0</div></div>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <a href="/vendor/dashboard" class="nav-item" data-nav="home"><span>Home</span></a>
+    <a href="/vendor/orders-page" class="nav-item" data-nav="orders"><span>Orders</span></a>
+    <a href="/vendor/products-page" class="nav-item" data-nav="products"><span>Products</span></a>
+    <a href="/vendor/account" class="nav-item active" data-nav="account"><span>Account</span></a>
+  </nav>
+<script>
+ async function fetchJSON(u,o={}){ const r= await fetch(u,o); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+ async function load(){
+   try { const resp = await fetchJSON('/vendor/account/summary'); if(!resp.success) throw new Error(resp.error||'Failed'); const { vendor, stats } = resp.data; businessName.textContent = vendor.business_name || 'Business'; ownerName.textContent = vendor.business_name || '-'; email.textContent = vendor.email; phone.textContent = vendor.business_contact || '-'; address.textContent = vendor.location || '-'; statTotal.textContent = stats.totalOrders; statEarnings.textContent = '$'+Number(stats.monthlyEarnings).toFixed(2); statPending.textContent = stats.pendingOrders; } catch(e){ alert(e.message); }
+ }
+ document.getElementById('refreshBtn').addEventListener('click', load);
+ load();
+</script>
+</body>
+</html>
