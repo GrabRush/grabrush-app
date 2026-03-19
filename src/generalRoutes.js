@@ -42,7 +42,7 @@ router.get('/welcome', (req, res) => {
     <!-- Top Header -->
     <header class="app-header">
       <div class="header-top">
-        <div class="location-selector">
+        <a href="/location" class="location-selector">
           <svg class="location-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
             <circle cx="12" cy="10" r="3"/>
@@ -51,7 +51,7 @@ router.get('/welcome', (req, res) => {
           <svg class="chevron-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-        </div>
+        </a>
         <div class="notification-icon">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path d="M10 2C6.69 2 4 4.69 4 8v4.59l-1.71 1.7a1 1 0 00-.29.7v1a1 1 0 001 1h14a1 1 0 001-1v-1a1 1 0 00-.29-.7L16 12.59V8c0-3.31-2.69-6-6-6z" fill="currentColor"/>
@@ -580,7 +580,7 @@ router.get('/mystery-box', (req, res) => {
         <!-- Top Header -->
         <header class="app-header">
           <div class="header-top">
-            <div class="location-selector">
+            <a href="/location" class="location-selector">
               <svg class="location-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                 <circle cx="12" cy="10" r="3"/>
@@ -589,7 +589,7 @@ router.get('/mystery-box', (req, res) => {
               <svg class="chevron-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-            </div>
+            </a>
             <div class="notification-icon">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M10 2C6.69 2 4 4.69 4 8v4.59l-1.71 1.7a1 1 0 00-.29.7v1a1 1 0 001 1h14a1 1 0 001-1v-1a1 1 0 00-.29-.7L16 12.59V8c0-3.31-2.69-6-6-6z" fill="currentColor"/>

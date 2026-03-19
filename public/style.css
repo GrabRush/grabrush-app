@@ -406,6 +406,8 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     transition: background-color 0.2s;
+    text-decoration: none;
+    color: inherit;
 }
 
 .location-selector:hover {
