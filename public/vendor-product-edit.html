@@ -11,7 +11,7 @@
  h1 { font-size:22px; margin:0 0 16px; }
  form { background:#fff; padding:18px 20px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
  label { display:block; font-size:12px; font-weight:600; margin:12px 0 6px; }
- input[type=text], input[type=number], textarea { width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:8px; font-size:14px; font-family:inherit; }
+ input[type=text], input[type=number], input[type=file], textarea, select { width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:8px; font-size:14px; font-family:inherit; box-sizing:border-box; }
  textarea { min-height:120px; resize:vertical; }
  .row { display:flex; gap:12px; }
  .row .col { flex:1; }
@@ -19,10 +19,17 @@
  button { background:#4CAF50; color:#fff; border:none; padding:12px 18px; font-size:14px; border-radius:8px; cursor:pointer; font-weight:600; }
  .cancel { background:#777; }
  .status { margin-top:10px; font-size:13px; }
+ .hint { margin-top:6px; font-size:12px; color:#666; }
+ .image-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+ .image-panel { margin-top:12px; padding:12px; border:1px dashed #ccc; border-radius:12px; background:#fafafa; }
+ .image-panel strong { display:block; margin-bottom:8px; font-size:13px; }
+ .image-panel img { display:none; width:100%; max-height:220px; object-fit:cover; border-radius:10px; }
+ .image-panel .empty { font-size:13px; color:#777; }
  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #ddd; height: 56px; box-shadow: 0 -2px 6px rgba(0,0,0,0.06); z-index: 100; }
  .bottom-nav .nav-item { flex: 1; text-align: center; text-decoration: none; font-size: 12px; color: #555; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 500; }
  .bottom-nav .nav-item.active { color: #4CAF50; font-weight: 600; }
  @media (min-width: 900px) { .bottom-nav { max-width: 600px; margin: 0 auto; left: 50%; transform: translateX(-50%); border-radius: 12px 12px 0 0; } }
+ @media (max-width: 640px) { .image-grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -33,6 +40,23 @@
       <input type="text" id="name" name="name" required />
       <label for="description">Description</label>
       <textarea id="description" name="description"></textarea>
+      <label for="image_url">New Image URL</label>
+      <input type="text" id="image_url" name="image_url" placeholder="https://..." />
+      <label for="image_file">Upload New Image</label>
+      <input type="file" id="image_file" name="image_file" accept="image/*" />
+      <div class="hint">Leave both fields empty to keep the current image. If both are provided, the uploaded file will be used.</div>
+      <div class="image-grid">
+        <div class="image-panel">
+          <strong>Current Image</strong>
+          <div class="empty" id="currentImageEmpty">No current image.</div>
+          <img id="currentImagePreview" alt="Current product image" />
+        </div>
+        <div class="image-panel">
+          <strong>New Image Preview</strong>
+          <div class="empty" id="newImageEmpty">No new image selected.</div>
+          <img id="newImagePreview" alt="New product image preview" />
+        </div>
+      </div>
       <div class="row">
         <div class="col">
           <label for="price">Price</label>
@@ -84,11 +108,41 @@
   </nav>
 <script>
   function getParam(key){ const u=new URL(window.location.href); return u.searchParams.get(key); }
-  async function fetchJSON(url,opt={}){ const r= await fetch(url,{ headers:{'Content-Type':'application/json'}, ...opt}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+  async function fetchJSON(url,opt={}){ const headers = { ...(opt.headers || {}) }; if(!(opt.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type']='application/json'; const r= await fetch(url,{ ...opt, headers }); const data = await r.json(); if(!r.ok) throw new Error(data.error || ('HTTP '+r.status)); return data; }
   const id = getParam('id'); if(!id){ document.getElementById('editForm').innerHTML='<p>No product id provided.</p>'; }
-  async function load(){ try { const data = await fetchJSON('/vendor/products'); if(!data.success) throw new Error('Load failed'); const prod = data.data.find(p=>String(p.id)===String(id)); if(!prod){ document.getElementById('editForm').innerHTML='<p>Product not found.</p>'; return; } Object.entries({ name:prod.name, description:prod.description||'', price:prod.price, discount:prod.discount, quantity:prod.quantity, category:prod.category||'', is_premium: prod.is_premium?1:0, enable_today: prod.enable_today?1:0 }).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; }); } catch(e){ document.getElementById('status').textContent=e.message; }
+  const currentImagePreview = document.getElementById('currentImagePreview');
+  const currentImageEmpty = document.getElementById('currentImageEmpty');
+  const newImagePreview = document.getElementById('newImagePreview');
+  const newImageEmpty = document.getElementById('newImageEmpty');
+  const imageUrlInput = document.getElementById('image_url');
+  const imageFileInput = document.getElementById('image_file');
+
+  function setImage(previewEl, emptyEl, src, emptyText){
+    if(!src){
+      previewEl.style.display='none';
+      previewEl.removeAttribute('src');
+      emptyEl.textContent=emptyText;
+      emptyEl.style.display='block';
+      return;
+    }
+    previewEl.src=src;
+    previewEl.style.display='block';
+    emptyEl.style.display='none';
   }
-  async function save(e){ e.preventDefault(); const payload={ name: name.value, description: description.value, price: parseFloat(price.value), discount: parseFloat(discount.value||0)||0, quantity: parseInt(quantity.value||0), category: category.value, is_premium: is_premium.value==='1', enable_today: enable_today.value==='1' }; try { const r = await fetchJSON('/vendor/products/'+id,{ method:'PUT', body: JSON.stringify(payload) }); if(!r.success) throw new Error(r.error||'Update failed'); status.textContent='Saved successfully'; setTimeout(()=>{ window.location.href='/vendor/products-page'; }, 800); } catch(err){ status.textContent=err.message; }
+
+  function updateNewPreview(){
+    const file = imageFileInput.files && imageFileInput.files[0];
+    if(file){ setImage(newImagePreview, newImageEmpty, URL.createObjectURL(file), 'No new image selected.'); return; }
+    const url = imageUrlInput.value.trim();
+    setImage(newImagePreview, newImageEmpty, url || '', 'No new image selected.');
+  }
+
+  imageUrlInput.addEventListener('input', updateNewPreview);
+  imageFileInput.addEventListener('change', updateNewPreview);
+
+  async function load(){ try { const data = await fetchJSON('/vendor/products'); if(!data.success) throw new Error('Load failed'); const prod = data.data.find(p=>String(p.id)===String(id)); if(!prod){ document.getElementById('editForm').innerHTML='<p>Product not found.</p>'; return; } Object.entries({ name:prod.name, description:prod.description||'', price:prod.price, discount:prod.discount, quantity:prod.quantity, category:prod.category||'', is_premium: prod.is_premium?1:0, enable_today: prod.enable_today?1:0 }).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; }); setImage(currentImagePreview, currentImageEmpty, prod.image_url || '', 'No current image.'); } catch(e){ document.getElementById('status').textContent=e.message; }
+  }
+  async function save(e){ e.preventDefault(); const payload=new FormData(); payload.append('name', name.value); payload.append('description', description.value); payload.append('price', price.value); payload.append('discount', discount.value || '0'); payload.append('quantity', quantity.value || '0'); payload.append('category', category.value); payload.append('is_premium', is_premium.value); payload.append('enable_today', enable_today.value); const imageUrl = imageUrlInput.value.trim(); if(imageUrl) payload.append('image_url', imageUrl); const file = imageFileInput.files && imageFileInput.files[0]; if(file) payload.append('image_file', file); try { const r = await fetchJSON('/vendor/products/'+id,{ method:'PUT', body: payload }); if(!r.success) throw new Error(r.error||'Update failed'); status.textContent='Saved successfully'; setTimeout(()=>{ window.location.href='/vendor/products-page'; }, 800); } catch(err){ status.textContent=err.message; }
   }
   document.getElementById('editForm').addEventListener('submit', save);
   document.getElementById('cancelBtn').addEventListener('click', ()=>window.location.href='/vendor/products-page');
