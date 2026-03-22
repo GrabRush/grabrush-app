@@ -1,4 +1,7 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const { body, validationResult } = require('express-validator');
 const logger = require('./logger');
 const { executeQuery, pool } = require('../database');
@@ -13,10 +16,63 @@ function requireVendor(req, res, next) {
   next();
 }
 
-// Serve vendor pages (HTML static files already in /public)
-const path = require('path');
 function sendVendorPage(res, filename){
   res.sendFile(path.join(__dirname, '..', 'public', filename));
+}
+
+const productUploadsDir = path.join(__dirname, '..', 'public', 'uploads', 'products');
+fs.mkdirSync(productUploadsDir, { recursive: true });
+
+const allowedProductImageMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif'
+]);
+
+const productImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, productUploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}${ext}`);
+  }
+});
+
+const uploadProductImage = multer({
+  storage: productImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (allowedProductImageMimeTypes.has(file.mimetype)) {
+      return cb(null, true);
+    }
+    cb(new Error('Only JPG, PNG, WEBP, and GIF images are allowed'));
+  }
+});
+
+function handleProductImageUpload(req, res, next) {
+  uploadProductImage.single('image_file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, error: 'Image must be 5 MB or smaller' });
+    }
+    return res.status(400).json({ success: false, error: err.message || 'Invalid image upload' });
+  });
+}
+
+function normalizeBoolean(value) {
+  return value === true || value === 'true' || value === '1' || value === 1;
+}
+
+function removeUploadedFile(file) {
+  if (!file || !file.path) return;
+  fs.promises.unlink(file.path).catch(() => {});
+}
+
+function removeLocalProductImage(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('/uploads/products/')) return;
+  const imagePath = path.join(__dirname, '..', 'public', imageUrl.replace(/^\//, ''));
+  fs.promises.unlink(imagePath).catch(() => {});
 }
 router.get('/dashboard', requireVendor, (req, res) => sendVendorPage(res, 'vendor-dashboard.html'));
 router.get('/orders-page', requireVendor, (req, res) => sendVendorPage(res, 'vendor-orders.html'));
@@ -30,20 +86,23 @@ router.get('/schedule-offer', requireVendor, (req, res) => sendVendorPage(res, '
 // Create product
 router.post('/products',
   requireVendor,
+  handleProductImageUpload,
   [
     body('name').isString().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
     body('price').isFloat({ gt: 0 }).withMessage('Price must be a positive number'),
     body('quantity').optional({ checkFalsy: true }).isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
     body('discount').optional({ checkFalsy: true, nullable: true }).customSanitizer(v => (v === '' || v === undefined ? null : v)).isFloat({ min: 0 }).withMessage('Discount must be a non-negative number'),
     body('is_premium').optional().isBoolean(),
-    body('pickup_start_time').optional().isISO8601(),
-    body('pickup_end_time').optional().isISO8601()
+    body('enable_today').optional().isBoolean(),
+    body('pickup_start_time').optional({ checkFalsy: true }).isISO8601(),
+    body('pickup_end_time').optional({ checkFalsy: true }).isISO8601()
   ],
   async (req, res) => {
     try {
       const vendorId = req.session.userId;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        removeUploadedFile(req.file);
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
@@ -52,13 +111,18 @@ router.post('/products',
       }
 
       const { image_url, name, description, category, quantity, price, discount, is_premium, pickup_start_time, pickup_end_time, enable_today } = req.body;
+      const resolvedImageUrl = req.file ? `/uploads/products/${req.file.filename}` : (image_url || null);
       const insertQuery = `INSERT INTO products (vendor_id, image_url, name, description, category, quantity, price, discount, is_premium, pickup_start_time, pickup_end_time, enable_today) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-      const params = [vendorId, image_url || null, name, description || null, category || null, quantity != null ? quantity : 0, price, discount != null ? discount : 0, is_premium ? 1 : 0, pickup_start_time || null, pickup_end_time || null, enable_today ? 1 : 0];
+      const params = [vendorId, resolvedImageUrl, name, description || null, category || null, quantity != null ? quantity : 0, price, discount != null ? discount : 0, normalizeBoolean(is_premium) ? 1 : 0, pickup_start_time || null, pickup_end_time || null, normalizeBoolean(enable_today) ? 1 : 0];
       const result = await executeQuery(insertQuery, params);
-      if (!result.success) return res.status(500).json({ success: false, error: result.error });
+      if (!result.success) {
+        removeUploadedFile(req.file);
+        return res.status(500).json({ success: false, error: result.error });
+      }
       const productResult = await executeQuery('SELECT * FROM products WHERE id = LAST_INSERT_ID()');
       res.status(201).json({ success: true, data: productResult.data[0] });
     } catch (error) {
+      removeUploadedFile(req.file);
       logger.error('Create product error', error);
       res.status(500).json({ success: false, error: 'Failed to create product' });
     }
@@ -66,29 +130,64 @@ router.post('/products',
 );
 
 // Update product
-router.put('/products/:id', requireVendor, [
+router.put('/products/:id', requireVendor, handleProductImageUpload, [
+  body('image_url').optional({ nullable: true }).isString(),
   body('name').optional().isString().trim().isLength({ min: 2 }),
   body('price').optional().isFloat({ gt: 0 }),
   body('quantity').optional().isInt({ min: 0 }),
-  body('discount').optional().isFloat({ min: 0 }),
+  body('discount').optional({ checkFalsy: true, nullable: true }).isFloat({ min: 0 }),
   body('is_premium').optional().isBoolean(),
-  body('enable_today').optional().isBoolean()
+  body('enable_today').optional().isBoolean(),
+  body('pickup_start_time').optional({ checkFalsy: true }).isISO8601(),
+  body('pickup_end_time').optional({ checkFalsy: true }).isISO8601()
 ], async (req, res) => {
   try {
     const vendorId = req.session.userId; const productId = req.params.id;
-    const verify = await executeQuery('SELECT id FROM products WHERE id = ? AND vendor_id = ?', [productId, vendorId]);
-    if(!verify.success || verify.data.length === 0) return res.status(404).json({ success:false, error:'Product not found' });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      removeUploadedFile(req.file);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array().map(e => ({ field: e.path || e.param, message: e.msg }))
+      });
+    }
+    const verify = await executeQuery('SELECT id, image_url FROM products WHERE id = ? AND vendor_id = ?', [productId, vendorId]);
+    if(!verify.success || verify.data.length === 0) {
+      removeUploadedFile(req.file);
+      return res.status(404).json({ success:false, error:'Product not found' });
+    }
+    const existingProduct = verify.data[0];
     const fields = ['name','description','category','quantity','price','discount','is_premium','pickup_start_time','pickup_end_time','enable_today'];
     const updates = []; const params = [];
-    fields.forEach(f => { if(req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(f === 'is_premium' || f === 'enable_today' ? (req.body[f] ? 1 : 0) : req.body[f]); } });
+    fields.forEach(f => {
+      if(req.body[f] !== undefined) {
+        updates.push(`${f} = ?`);
+        params.push(f === 'is_premium' || f === 'enable_today' ? (normalizeBoolean(req.body[f]) ? 1 : 0) : req.body[f]);
+      }
+    });
+    let nextImageUrl;
+    if (req.file) nextImageUrl = `/uploads/products/${req.file.filename}`;
+    else if (req.body.image_url !== undefined) nextImageUrl = req.body.image_url || null;
+    if (nextImageUrl !== undefined) {
+      updates.push('image_url = ?');
+      params.push(nextImageUrl);
+    }
     if(updates.length === 0) return res.json({ success:true, data:{ id: productId } });
     params.push(productId);
     const q = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
     const upd = await executeQuery(q, params);
-    if(!upd.success) return res.status(500).json({ success:false, error:upd.error });
+    if(!upd.success) {
+      removeUploadedFile(req.file);
+      return res.status(500).json({ success:false, error:upd.error });
+    }
     const fresh = await executeQuery('SELECT * FROM products WHERE id = ?', [productId]);
+    if (nextImageUrl !== undefined && nextImageUrl !== existingProduct.image_url) {
+      removeLocalProductImage(existingProduct.image_url);
+    }
     res.json({ success:true, data:fresh.data[0] });
   } catch(err){
+    removeUploadedFile(req.file);
     logger.error('Update product error', err);
     res.status(500).json({ success:false, error:'Failed to update product' });
   }
@@ -98,10 +197,11 @@ router.put('/products/:id', requireVendor, [
 router.delete('/products/:id', requireVendor, async (req, res) => {
   try {
     const vendorId = req.session.userId; const productId = req.params.id;
-    const verify = await executeQuery('SELECT id FROM products WHERE id = ? AND vendor_id = ?', [productId, vendorId]);
+    const verify = await executeQuery('SELECT id, image_url FROM products WHERE id = ? AND vendor_id = ?', [productId, vendorId]);
     if(!verify.success || verify.data.length === 0) return res.status(404).json({ success:false, error:'Product not found' });
     const del = await executeQuery('DELETE FROM products WHERE id = ?', [productId]);
     if(!del.success) return res.status(500).json({ success:false, error:del.error });
+    removeLocalProductImage(verify.data[0].image_url);
     res.json({ success:true, data:{ id: productId, deleted:true } });
   } catch(err){
     logger.error('Delete product error', err);
@@ -126,11 +226,11 @@ router.get('/products', requireVendor, async (req, res) => {
 router.get('/catalog', requireVendor, async (req, res) => {
   try {
     const vendorId = req.session.userId; const filter = (req.query.filter || 'all').toLowerCase();
-    const productsResult = await executeQuery('SELECT id, name, description, price, discount, quantity, is_premium, enable_today, created_at FROM products WHERE vendor_id = ? ORDER BY created_at DESC', [vendorId]);
+    const productsResult = await executeQuery('SELECT id, image_url, name, description, price, discount, quantity, is_premium, enable_today, created_at FROM products WHERE vendor_id = ? ORDER BY created_at DESC', [vendorId]);
     const boxesResult = await executeQuery('SELECT id, title, price, quantity, created_at FROM mystery_boxes WHERE vendor_id = ? ORDER BY created_at DESC', [vendorId]);
     if(!productsResult.success || !boxesResult.success) return res.status(500).json({ success:false, error:'Failed to load catalog' });
     let items = [];
-    items.push(...productsResult.data.map(p => ({ id:p.id, name:p.name, description:p.description, price:p.price, discount:p.discount, quantity:p.quantity, is_premium: !!p.is_premium, enable_today: !!p.enable_today, type:'product', created_at:p.created_at })));
+    items.push(...productsResult.data.map(p => ({ id:p.id, image_url:p.image_url, name:p.name, description:p.description, price:p.price, discount:p.discount, quantity:p.quantity, is_premium: !!p.is_premium, enable_today: !!p.enable_today, type:'product', created_at:p.created_at })));
     items.push(...boxesResult.data.map(b => ({ id:b.id, title:b.title, price:b.price, quantity:b.quantity, type:'mystery_box', created_at:b.created_at })));
     if(filter === 'mystery') items = items.filter(i => i.type === 'mystery_box');
     else if(filter === 'premium') items = items.filter(i => i.type === 'product' && i.is_premium);

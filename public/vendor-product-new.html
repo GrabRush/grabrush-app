@@ -11,12 +11,16 @@
     form { display:grid; gap:16px; }
     .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     label { font-weight:600; font-size:14px; display:flex; flex-direction:column; }
-    input[type=text], input[type=number], input[type=datetime-local], textarea { margin-top:6px; padding:10px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
+    input[type=text], input[type=number], input[type=datetime-local], input[type=file], textarea, select { margin-top:6px; padding:10px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px; font-family:inherit; }
     textarea { resize:vertical; min-height:110px; }
     .actions { display:flex; gap:12px; }
     .btn { background:#4CAF50; color:#fff; border:none; padding:12px 22px; border-radius:8px; font-weight:600; cursor:pointer; }
     .btn.secondary { background:#555; }
     .statusBox { margin-top:12px; font-size:14px; }
+    .hint { margin-top:6px; color:#666; font-size:12px; }
+    .previewBox { border:1px dashed #ccc; border-radius:12px; padding:12px; background:#fafafa; }
+    .previewBox img { display:none; width:100%; max-width:260px; max-height:200px; object-fit:cover; border-radius:10px; }
+    .previewBox .empty { color:#777; font-size:13px; }
   </style>
 </head>
 <body>
@@ -29,6 +33,14 @@
       <label>Product Image URL
         <input type="text" name="image_url" placeholder="https://..." />
       </label>
+      <label>Upload Product Image
+        <input type="file" name="image_file" id="image_file" accept="image/*" />
+      </label>
+      <div class="hint">You can provide a URL, upload an image file, or both. If both are provided, the uploaded file will be used.</div>
+      <div class="previewBox">
+        <div class="empty" id="previewEmpty">No image selected.</div>
+        <img id="imagePreview" alt="Product image preview" />
+      </div>
       <label>Product Name*
         <input type="text" name="name" required />
       </label>
@@ -75,18 +87,44 @@
   </div>
 
   <script>
-    function formToJSON(form){ const data=new FormData(form); const obj={}; data.forEach((v,k)=>{ obj[k]=v; }); return obj; }
+    const imageUrlInput = document.querySelector('input[name="image_url"]');
+    const imageFileInput = document.getElementById('image_file');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewEmpty = document.getElementById('previewEmpty');
+
+    function setPreview(src){
+      if(!src){
+        imagePreview.style.display='none';
+        imagePreview.removeAttribute('src');
+        previewEmpty.textContent='No image selected.';
+        previewEmpty.style.display='block';
+        return;
+      }
+      imagePreview.src=src;
+      imagePreview.style.display='block';
+      previewEmpty.style.display='none';
+    }
+
+    function updatePreview(){
+      const file = imageFileInput.files && imageFileInput.files[0];
+      if(file){ setPreview(URL.createObjectURL(file)); return; }
+      const url = imageUrlInput.value.trim();
+      setPreview(url || '');
+    }
+
+    imageUrlInput.addEventListener('input', updatePreview);
+    imageFileInput.addEventListener('change', updatePreview);
+
     document.getElementById('productForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
       const status=document.getElementById('statusBox'); status.textContent='Saving...';
-      const payload=formToJSON(e.target);
-      payload.is_premium = payload.is_premium === 'true';
-      payload.enable_today = payload.enable_today === 'true';
-      if(!payload.price){ status.textContent='Price is required.'; return; }
+      status.style.color='';
+      const payload=new FormData(e.target);
+      if(!payload.get('price')){ status.textContent='Price is required.'; return; }
       try {
-        const res = await fetch('/vendor/products', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        const res = await fetch('/vendor/products', { method:'POST', body: payload });
         const j=await res.json();
-        if(j.success){ status.style.color='green'; status.textContent='Created successfully.'; e.target.reset(); }
+        if(j.success){ status.style.color='green'; status.textContent='Created successfully.'; e.target.reset(); setPreview(''); }
         else { status.style.color='red'; status.textContent=j.error || 'Failed.'; console.error(j); }
       } catch(err){ status.style.color='red'; status.textContent='Request failed.'; console.error(err); }
     });
