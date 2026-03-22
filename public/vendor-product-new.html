@@ -45,7 +45,12 @@
         <input type="text" name="name" required />
       </label>
       <label>Category
-        <input type="text" name="category" />
+        <select name="category">
+          <option value="">Select a category</option>
+          <option value="premium-dine-in">Premium Dine-in</option>
+          <option value="grocery">Grocery</option>
+          <option value="deals">Deals</option>
+        </select>
       </label>
       <label>Quantity
         <input type="number" name="quantity" min="0" value="0" />
@@ -54,7 +59,7 @@
         <input type="number" name="price" step="0.01" min="0" required />
       </label>
       <label>Discount*
-        <input type="number" name="discount" step="0.01" min="0" />
+        <input type="number" name="discount" step="0.01" min="0" required />
       </label>
       <div class="row-2">
         <label>Pickup Starts
@@ -91,6 +96,7 @@
     const imageFileInput = document.getElementById('image_file');
     const imagePreview = document.getElementById('imagePreview');
     const previewEmpty = document.getElementById('previewEmpty');
+    const productForm = document.getElementById('productForm');
 
     function setPreview(src){
       if(!src){
@@ -119,13 +125,22 @@
       e.preventDefault();
       const status=document.getElementById('statusBox'); status.textContent='Saving...';
       status.style.color='';
+      if(!productForm.reportValidity()){
+        status.style.color='red';
+        status.textContent='Please fill in all required fields before creating the product.';
+        return;
+      }
       const payload=new FormData(e.target);
-      if(!payload.get('price')){ status.textContent='Price is required.'; return; }
       try {
         const res = await fetch('/vendor/products', { method:'POST', body: payload });
         const j=await res.json();
         if(j.success){ status.style.color='green'; status.textContent='Created successfully.'; e.target.reset(); setPreview(''); }
-        else { status.style.color='red'; status.textContent=j.error || 'Failed.'; console.error(j); }
+        else {
+          const detailMessage = Array.isArray(j.details) && j.details.length ? j.details.map(detail => detail.message).join(' ') : '';
+          status.style.color='red';
+          status.textContent=detailMessage || j.error || 'Failed.';
+          console.error(j);
+        }
       } catch(err){ status.style.color='red'; status.textContent='Request failed.'; console.error(err); }
     });
   </script>

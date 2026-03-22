@@ -88,10 +88,10 @@ router.post('/products',
   requireVendor,
   handleProductImageUpload,
   [
-    body('name').isString().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
-    body('price').isFloat({ gt: 0 }).withMessage('Price must be a positive number'),
+    body('name').trim().notEmpty().withMessage('Name is required').bail().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
+    body('price').notEmpty().withMessage('Price is required').bail().isFloat({ gt: 0 }).withMessage('Price must be a positive number'),
     body('quantity').optional({ checkFalsy: true }).isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
-    body('discount').optional({ checkFalsy: true, nullable: true }).customSanitizer(v => (v === '' || v === undefined ? null : v)).isFloat({ min: 0 }).withMessage('Discount must be a non-negative number'),
+    body('discount').notEmpty().withMessage('Discount is required').bail().isFloat({ min: 0 }).withMessage('Discount must be a non-negative number'),
     body('is_premium').optional().isBoolean(),
     body('enable_today').optional().isBoolean(),
     body('pickup_start_time').optional({ checkFalsy: true }).isISO8601(),
@@ -113,7 +113,7 @@ router.post('/products',
       const { image_url, name, description, category, quantity, price, discount, is_premium, pickup_start_time, pickup_end_time, enable_today } = req.body;
       const resolvedImageUrl = req.file ? `/uploads/products/${req.file.filename}` : (image_url || null);
       const insertQuery = `INSERT INTO products (vendor_id, image_url, name, description, category, quantity, price, discount, is_premium, pickup_start_time, pickup_end_time, enable_today) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-      const params = [vendorId, resolvedImageUrl, name, description || null, category || null, quantity != null ? quantity : 0, price, discount != null ? discount : 0, normalizeBoolean(is_premium) ? 1 : 0, pickup_start_time || null, pickup_end_time || null, normalizeBoolean(enable_today) ? 1 : 0];
+      const params = [vendorId, resolvedImageUrl, name, description || null, category || null, quantity !== undefined && quantity !== null && quantity !== '' ? quantity : 0, price, discount, normalizeBoolean(is_premium) ? 1 : 0, pickup_start_time || null, pickup_end_time || null, normalizeBoolean(enable_today) ? 1 : 0];
       const result = await executeQuery(insertQuery, params);
       if (!result.success) {
         removeUploadedFile(req.file);

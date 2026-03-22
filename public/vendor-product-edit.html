@@ -74,7 +74,12 @@
         </div>
         <div class="col">
           <label for="category">Category</label>
-          <input type="text" id="category" name="category" />
+          <select id="category" name="category">
+            <option value="">Select a category</option>
+            <option value="premium-dine-in">Premium Dine-in</option>
+            <option value="grocery">Grocery</option>
+            <option value="deals">Deals</option>
+          </select>
         </div>
       </div>
       <div class="row">
@@ -140,7 +145,7 @@
   imageUrlInput.addEventListener('input', updateNewPreview);
   imageFileInput.addEventListener('change', updateNewPreview);
 
-  async function load(){ try { const data = await fetchJSON('/vendor/products'); if(!data.success) throw new Error('Load failed'); const prod = data.data.find(p=>String(p.id)===String(id)); if(!prod){ document.getElementById('editForm').innerHTML='<p>Product not found.</p>'; return; } Object.entries({ name:prod.name, description:prod.description||'', price:prod.price, discount:prod.discount, quantity:prod.quantity, category:prod.category||'', is_premium: prod.is_premium?1:0, enable_today: prod.enable_today?1:0 }).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; }); setImage(currentImagePreview, currentImageEmpty, prod.image_url || '', 'No current image.'); } catch(e){ document.getElementById('status').textContent=e.message; }
+  async function load(){ try { const data = await fetchJSON('/vendor/products'); if(!data.success) throw new Error('Load failed'); const prod = data.data.find(p=>String(p.id)===String(id)); if(!prod){ document.getElementById('editForm').innerHTML='<p>Product not found.</p>'; return; } const categorySelect = document.getElementById('category'); const categoryValue = prod.category || ''; if(categoryValue && !Array.from(categorySelect.options).some(option => option.value === categoryValue)){ const customOption = document.createElement('option'); customOption.value = categoryValue; customOption.textContent = categoryValue; categorySelect.appendChild(customOption); } Object.entries({ name:prod.name, description:prod.description||'', price:prod.price, discount:prod.discount, quantity:prod.quantity, category:categoryValue, is_premium: prod.is_premium?1:0, enable_today: prod.enable_today?1:0 }).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; }); setImage(currentImagePreview, currentImageEmpty, prod.image_url || '', 'No current image.'); } catch(e){ document.getElementById('status').textContent=e.message; }
   }
   async function save(e){ e.preventDefault(); const payload=new FormData(); payload.append('name', name.value); payload.append('description', description.value); payload.append('price', price.value); payload.append('discount', discount.value || '0'); payload.append('quantity', quantity.value || '0'); payload.append('category', category.value); payload.append('is_premium', is_premium.value); payload.append('enable_today', enable_today.value); const imageUrl = imageUrlInput.value.trim(); if(imageUrl) payload.append('image_url', imageUrl); const file = imageFileInput.files && imageFileInput.files[0]; if(file) payload.append('image_file', file); try { const r = await fetchJSON('/vendor/products/'+id,{ method:'PUT', body: payload }); if(!r.success) throw new Error(r.error||'Update failed'); status.textContent='Saved successfully'; setTimeout(()=>{ window.location.href='/vendor/products-page'; }, 800); } catch(err){ status.textContent=err.message; }
   }
