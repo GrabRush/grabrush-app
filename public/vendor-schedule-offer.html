@@ -30,6 +30,10 @@
     .form-group { display: flex; flex-direction: column; }
     .form-group label { font-size: 12px; color: #666; margin-bottom: 6px; }
     .form-group input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .required-mark { color: #d93025; font-weight: 700; }
+    .field-hint { font-size: 11px; color: #888; margin-top: 4px; }
+    .form-group input.invalid { border-color: #d93025; background: #fff5f5; }
+    .validation-message { margin-top: 6px; font-size: 11px; color: #d93025; min-height: 16px; }
     .form-group input[type="date"] { position: relative; }
     .form-group input[type="time"] { position: relative; }
     .input-with-icon { position: relative; }
@@ -61,6 +65,7 @@
     .schedule-btn:disabled { background: #ccc; cursor: not-allowed; }
     
     .empty-state { text-align: center; padding: 40px; color: #666; }
+    .form-error-summary { display: none; background: #fff1f0; color: #b42318; border: 1px solid #f3b5b0; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -80,6 +85,7 @@
     <div class="product-cards" id="productCards">
       <div class="empty-state">No products selected. Select a product from the dropdown above to schedule an offer.</div>
     </div>
+    <div class="form-error-summary" id="formErrorSummary"></div>
     
     <button class="schedule-btn" id="scheduleBtn" disabled>Schedule</button>
   </div>
@@ -169,7 +175,7 @@
         
         <div class="form-row">
           <div class="form-group">
-            <label>Select a Date</label>
+            <label>Select a Date <span class="required-mark">*</span></label>
             <div class="input-with-icon">
               <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -177,15 +183,19 @@
                 <line x1="8" y1="2" x2="8" y2="6"/>
                 <line x1="3" y1="10" x2="21" y2="10"/>
               </svg>
-              <input type="date" class="offer-date" value="${defaultDateStr}" onchange="updateProduct(${productId})">
+              <input type="date" class="offer-date" value="${defaultDateStr}" required onchange="updateProduct(${productId})">
             </div>
+            <div class="field-hint">Required</div>
+            <div class="validation-message offer-date-error"></div>
           </div>
           <div class="form-group">
-            <label>Select a Time</label>
+            <label>Pickup Time Window <span class="required-mark">*</span></label>
             <div>
-              <input type="time" class="offer-start-time" value="20:00" onchange="updateProduct(${productId})" style="margin-bottom: 8px;">
-              <input type="time" class="offer-end-time" value="21:00" onchange="updateProduct(${productId})">
+              <input type="time" class="offer-start-time" value="20:00" required onchange="updateProduct(${productId})" style="margin-bottom: 8px;" aria-label="Pickup start time">
+              <input type="time" class="offer-end-time" value="21:00" required onchange="updateProduct(${productId})" aria-label="Pickup end time">
             </div>
+            <div class="field-hint">Pickup start and pickup end are required.</div>
+            <div class="validation-message offer-time-error"></div>
           </div>
         </div>
         
@@ -310,6 +320,7 @@
       }
       
       updateSavingsBanner(productId, product);
+      validateProductCard(card, false);
       updateScheduleButton();
     }
     
@@ -367,9 +378,50 @@
       const btn = document.getElementById('scheduleBtn');
       btn.disabled = selectedProducts.size === 0;
     }
+
+    function setFieldState(input, hasError) {
+      if(!input) return;
+      input.classList.toggle('invalid', hasError);
+    }
+
+    function validateProductCard(card, showMessages = true) {
+      const dateInput = card.querySelector('.offer-date');
+      const startInput = card.querySelector('.offer-start-time');
+      const endInput = card.querySelector('.offer-end-time');
+      const dateError = card.querySelector('.offer-date-error');
+      const timeError = card.querySelector('.offer-time-error');
+      const hasDate = Boolean(dateInput.value);
+      const hasStart = Boolean(startInput.value);
+      const hasEnd = Boolean(endInput.value);
+
+      setFieldState(dateInput, !hasDate);
+      setFieldState(startInput, !hasStart);
+      setFieldState(endInput, !hasEnd);
+
+      if(showMessages) {
+        dateError.textContent = hasDate ? '' : 'Pickup date is required.';
+        timeError.textContent = (!hasStart || !hasEnd) ? 'Pickup start and pickup end are required.' : '';
+      } else {
+        dateError.textContent = '';
+        timeError.textContent = '';
+      }
+
+      return hasDate && hasStart && hasEnd;
+    }
     
     async function scheduleOffers() {
       if(selectedProducts.size === 0) return;
+      const cards = Array.from(document.querySelectorAll('.product-card'));
+      const invalidCards = cards.filter(card => !validateProductCard(card, true));
+      const summary = document.getElementById('formErrorSummary');
+      if(invalidCards.length > 0) {
+        summary.textContent = 'Please fill in all required pickup date, pickup start, and pickup end fields before scheduling.';
+        summary.style.display = 'block';
+        invalidCards[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      summary.style.display = 'none';
+      summary.textContent = '';
       
       const offers = Array.from(selectedProducts.entries()).map(([productId, product]) => ({
         product_id: productId,
@@ -416,4 +468,3 @@
   </script>
 </body>
 </html>
-
