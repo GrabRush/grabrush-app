@@ -2,6 +2,18 @@
 let cartItems = [];
 let orderId = Math.floor(1000 + Math.random() * 9000); // Generate random order ID
 
+function getStoredLocation() {
+    return {
+        address: localStorage.getItem('pickupAddress') || 'House 17, Block A, Road 16, Banani',
+        city: localStorage.getItem('pickupCity') || 'Dhaka'
+    };
+}
+
+function setStoredLocation(address, city) {
+    localStorage.setItem('pickupAddress', address);
+    localStorage.setItem('pickupCity', city);
+}
+
 // Update order ID display
 function updateOrderId() {
     const orderIdElement = document.getElementById('orderId');
@@ -40,10 +52,7 @@ function displayCart() {
         restaurantNameHeader.textContent = '';
         return;
     }
-    
-    // Get restaurant name from first item
-    const restaurantName = cartItems[0].restaurantName;
-    restaurantNameHeader.textContent = restaurantName;
+    restaurantNameHeader.textContent = '';
     
     // Calculate totals
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -62,6 +71,8 @@ function displayCart() {
         pickupTime = pickupTime.replace('8:30 - 9:30', '8:30 PM - 9:30 PM');
     }
     
+    const location = getStoredLocation();
+
     cartContent.innerHTML = `
         <!-- Pickup Section -->
         <div class="pickup-card">
@@ -74,11 +85,11 @@ function displayCart() {
                         <circle cx="12" cy="10" r="3"/>
                     </svg>
                     <div class="location-details">
-                        <div class="location-address">House 17, Block A, Road 16, Banani</div>
-                        <div class="location-city">Dhaka</div>
+                        <div class="location-address">${location.address}</div>
+                        <div class="location-city">${location.city}</div>
                     </div>
                 </div>
-                <button class="change-location-btn">Change Location</button>
+                <button class="change-location-btn" type="button">Change Location</button>
             </div>
             
             <div class="pickup-time-section">
@@ -126,6 +137,26 @@ function displayCart() {
                 <div class="order-item-name">${itemSummary}</div>
                 <div class="order-item-price">$${subtotal.toFixed(2)}</div>
             </div>
+
+            <div class="order-items" id="orderItems">
+                ${cartItems.map(item => `
+            <div class="order-item-row">
+                        <div class="order-item-desc">
+                            <div class="order-item-title">${item.quantity}x ${item.itemName}</div>
+                            <div class="order-item-subtitle">${item.restaurantName}</div>
+                        </div>
+                        <div class="order-item-actions">
+                            <div class="order-item-lineprice">$${(item.price * item.quantity).toFixed(2)}</div>
+                            <div class="quantity-controls">
+                                <button class="qty-btn ${item.quantity <= 1 ? 'disabled' : ''}" data-action="decrease" data-restaurant="${item.restaurantName}" data-item="${item.itemName}" data-qty="${item.quantity}" ${item.quantity <= 1 ? 'disabled' : ''}>−</button>
+                                <span class="qty-value">${item.quantity}</span>
+                                <button class="qty-btn" data-action="increase" data-restaurant="${item.restaurantName}" data-item="${item.itemName}" data-qty="${item.quantity}">+</button>
+                            </div>
+                            <button class="remove-item-btn" data-restaurant="${item.restaurantName}" data-item="${item.itemName}">Remove</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
             
             <div class="cost-breakdown">
                 <div class="cost-row">
@@ -155,15 +186,97 @@ function displayCart() {
                 <span class="total-amount">$${total.toFixed(2)}</span>
             </div>
             <a href="#" class="see-breakdown" onclick="toggleBreakdown(); return false;">See Breakdown</a>
+            <div class="breakdown-panel" id="breakdownPanel" style="display:none;">
+                <div class="cost-row">
+                    <span class="cost-label">Subtotal</span>
+                    <span class="cost-value">$${subtotal.toFixed(2)}</span>
+                </div>
+                <div class="cost-row">
+                    <span class="cost-label">Delivery Fee</span>
+                    <span class="cost-value">$${deliveryFee.toFixed(2)}</span>
+                </div>
+                <div class="cost-row">
+                    <span class="cost-label">Platform Fee</span>
+                    <span class="cost-value">$${platformFee.toFixed(2)}</span>
+                </div>
+                <div class="cost-row total-breakdown">
+                    <span class="cost-label">Total</span>
+                    <span class="cost-value">$${total.toFixed(2)}</span>
+                </div>
+            </div>
             
             <button class="confirm-button" onclick="confirmOrder()">Confirm</button>
         </div>
     `;
+
+    const changeLocationBtn = cartContent.querySelector('.change-location-btn');
+    if (changeLocationBtn) {
+        changeLocationBtn.addEventListener('click', () => {
+            const nextAddress = prompt('Enter pickup address', location.address);
+            if (!nextAddress) return;
+            const nextCity = prompt('Enter city', location.city) || location.city;
+            setStoredLocation(nextAddress.trim(), nextCity.trim());
+            displayCart();
+        });
+    }
+
+    cartContent.querySelectorAll('.remove-item-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const restaurantName = btn.getAttribute('data-restaurant');
+            const itemName = btn.getAttribute('data-item');
+            try {
+                const response = await fetch('/api/cart/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ restaurantName, itemName })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    cartItems = data.cart || [];
+                    displayCart();
+                } else {
+                    alert(data.error || 'Unable to remove item.');
+                }
+            } catch (error) {
+                console.error('Error removing item:', error);
+                alert('Error removing item. Please try again.');
+            }
+        });
+    });
+
+    cartContent.querySelectorAll('.qty-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const restaurantName = btn.getAttribute('data-restaurant');
+            const itemName = btn.getAttribute('data-item');
+            const action = btn.getAttribute('data-action');
+            const currentQty = parseInt(btn.getAttribute('data-qty'), 10) || 1;
+            if (action === 'decrease' && currentQty <= 1) return;
+            const nextQty = action === 'increase' ? currentQty + 1 : currentQty - 1;
+            try {
+                const response = await fetch('/api/cart/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ restaurantName, itemName, quantity: nextQty })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    cartItems = data.cart || [];
+                    displayCart();
+                } else {
+                    alert(data.error || 'Unable to update quantity.');
+                }
+            } catch (error) {
+                console.error('Error updating quantity:', error);
+                alert('Error updating quantity. Please try again.');
+            }
+        });
+    });
 }
 
 function toggleBreakdown() {
-    // TODO: Implement breakdown toggle
-    alert('Breakdown feature coming soon!');
+    const panel = document.getElementById('breakdownPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
 async function confirmOrder() {

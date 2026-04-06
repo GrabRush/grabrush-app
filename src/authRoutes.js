@@ -50,6 +50,87 @@ router.post('/send-verification', async (req, res) => {
   }
 });
 
+// Forgot password page
+router.get('/forgot-password', (req, res) => {
+  res.sendFile(require('path').join(__dirname, '..', 'public', 'forgot-password.html'));
+});
+
+// Reset password page
+router.get('/reset-password', (req, res) => {
+  res.sendFile(require('path').join(__dirname, '..', 'public', 'reset-password.html'));
+});
+
+// Request password reset
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.redirect('/forgot-password?error=' + encodeURIComponent('Email is required'));
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 30); // 30 minutes
+
+    const userResult = await executeQuery('SELECT id FROM users WHERE email = ?', [email]);
+    const vendorResult = await executeQuery('SELECT id FROM vendors WHERE email = ?', [email]);
+    if ((!userResult.success || userResult.data.length === 0) && (!vendorResult.success || vendorResult.data.length === 0)) {
+      return res.redirect('/forgot-password?sent=true');
+    }
+
+    if (userResult.success && userResult.data.length > 0) {
+      await executeQuery('UPDATE users SET reset_token = ?, reset_expires = ? WHERE email = ?', [token, expires, email]);
+    }
+    if (vendorResult.success && vendorResult.data.length > 0) {
+      await executeQuery('UPDATE vendors SET reset_token = ?, reset_expires = ? WHERE email = ?', [token, expires, email]);
+    }
+
+    const resetLink = `${req.protocol}://${req.get('host')}/reset-password?token=${token}`;
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'your-email@gmail.com',
+      to: email,
+      subject: 'Reset your Grabrush password',
+      html: `<p>Click the link below to reset your password:</p><a href="${resetLink}">Reset Password</a>`
+    };
+
+    const transporter = createTransporter();
+    await transporter.sendMail(mailOptions);
+    res.redirect('/forgot-password?sent=true');
+  } catch (error) {
+    logger.error('Forgot password error', error);
+    res.redirect('/forgot-password?error=' + encodeURIComponent('Failed to send reset email'));
+  }
+});
+
+// Reset password submission
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password, confirm } = req.body;
+    if (!token || !password || !confirm) {
+      return res.redirect('/reset-password?error=' + encodeURIComponent('All fields are required'));
+    }
+    if (password !== confirm) {
+      return res.redirect(`/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent('Passwords do not match')}`);
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const now = new Date();
+
+    const userToken = await executeQuery('SELECT id FROM users WHERE reset_token = ? AND reset_expires > ?', [token, now]);
+    if (userToken.success && userToken.data.length > 0) {
+      await executeQuery('UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?', [hashedPassword, userToken.data[0].id]);
+      return res.redirect('/?success=' + encodeURIComponent('Password updated. Please login.'));
+    }
+
+    const vendorToken = await executeQuery('SELECT id FROM vendors WHERE reset_token = ? AND reset_expires > ?', [token, now]);
+    if (vendorToken.success && vendorToken.data.length > 0) {
+      await executeQuery('UPDATE vendors SET password = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?', [hashedPassword, vendorToken.data[0].id]);
+      return res.redirect('/?success=' + encodeURIComponent('Password updated. Please login.'));
+    }
+
+    return res.redirect(`/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent('Invalid or expired token')}`);
+  } catch (error) {
+    logger.error('Reset password error', error);
+    res.redirect('/reset-password?error=' + encodeURIComponent('Failed to reset password'));
+  }
+});
+
 // Registration (user & vendor)
 router.post('/register', async (req, res) => {
   try {

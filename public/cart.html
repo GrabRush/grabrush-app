@@ -36,6 +36,13 @@
             left: 16px;
             z-index: 10;
         }
+
+        .back-button:hover,
+        .back-button:focus {
+            background: none;
+            outline: none;
+            box-shadow: none;
+        }
         
         .cart-header-content {
             flex: 1;
@@ -58,6 +65,10 @@
             font-size: 14px;
             color: #4CAF50;
             font-weight: 500;
+        }
+
+        .restaurant-name-header:empty {
+            display: none;
         }
         
         .order-id {
@@ -212,6 +223,116 @@
             font-size: 14px;
             font-weight: 600;
         }
+
+        .order-items {
+            margin-top: 12px;
+            border-top: 1px solid #333;
+            padding-top: 12px;
+        }
+
+        .order-item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .order-item-row:last-child {
+            border-bottom: 0;
+        }
+
+        .order-item-desc {
+            flex: 1;
+        }
+
+        .order-item-title {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .order-item-subtitle {
+            color: #999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .order-item-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        .quantity-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 4px 6px;
+        }
+
+        .qty-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .qty-btn:hover {
+            background: #3a3a3a;
+        }
+
+        .qty-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .qty-value {
+            min-width: 18px;
+            text-align: center;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .order-item-lineprice {
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .remove-item-btn {
+            background: #333;
+            color: #ff9800;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .remove-item-btn:hover {
+            background: #3a3a3a;
+        }
+
+        .bottom-nav .nav-item:hover,
+        .bottom-nav .nav-item:focus {
+            background: transparent;
+            outline: none;
+        }
         
         .cost-breakdown {
             border-top: 1px solid #333;
@@ -285,6 +406,21 @@
             margin-top: 8px;
             display: inline-block;
         }
+
+        .breakdown-panel {
+            margin-top: 12px;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .total-breakdown {
+            margin-top: 8px;
+            border-top: 1px solid #333;
+            padding-top: 8px;
+            font-weight: 600;
+        }
         
         .confirm-button {
             background: #4CAF50;
@@ -302,6 +438,11 @@
         
         .confirm-button:hover {
             background: #45a049;
+        }
+
+        .confirm-button:focus {
+            outline: none;
+            box-shadow: none;
         }
         
         .empty-cart {
@@ -326,7 +467,7 @@
             </button>
             <div class="cart-header-content">
                 <h1>My Cart</h1>
-                <p class="restaurant-name-header" id="restaurantNameHeader">Loading...</p>
+                <p class="restaurant-name-header" id="restaurantNameHeader"></p>
             </div>
         </div>
         

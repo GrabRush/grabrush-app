@@ -55,6 +55,9 @@ async function initDatabase() {
   await ensureColumn('users','verification_token','verification_token VARCHAR(255)');
   await ensureColumn('users','favorites','favorites TEXT NULL');
   await ensureColumn('users','cart','cart TEXT NULL');
+  await ensureColumn('users','avatar_url','avatar_url VARCHAR(500) NULL');
+  await ensureColumn('users','reset_token','reset_token VARCHAR(255) NULL');
+  await ensureColumn('users','reset_expires','reset_expires DATETIME NULL');
 
   // Vendors table
   await executeQuery(`CREATE TABLE IF NOT EXISTS vendors (
@@ -76,6 +79,8 @@ async function initDatabase() {
   await ensureModifyNullable('vendors','business_contact','VARCHAR(20)');
   await ensureColumn('vendors','is_verified','is_verified BOOLEAN DEFAULT FALSE');
   await ensureColumn('vendors','verification_token','verification_token VARCHAR(255)');
+  await ensureColumn('vendors','reset_token','reset_token VARCHAR(255) NULL');
+  await ensureColumn('vendors','reset_expires','reset_expires DATETIME NULL');
 
   // Products table
   await executeQuery(`CREATE TABLE IF NOT EXISTS products (

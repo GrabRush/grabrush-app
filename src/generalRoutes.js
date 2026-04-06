@@ -1,7 +1,31 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const router = express.Router();
 const { executeQuery } = require('../database');
+
+const avatarDir = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
+if (!fs.existsSync(avatarDir)) {
+  fs.mkdirSync(avatarDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, avatarDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `avatar-${req.session.userId}-${Date.now()}${ext}`);
+  }
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Invalid file type'));
+    cb(null, true);
+  },
+  limits: { fileSize: 2 * 1024 * 1024 }
+});
 
 // Welcome page after successful login
 router.get('/welcome', (req, res) => {
@@ -52,11 +76,18 @@ router.get('/welcome', (req, res) => {
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
-        <div class="notification-icon">
+        <a href="/profile" class="profile-bubble" id="profileBubble" aria-label="Profile">
+          <div class="profile-avatar" id="profileAvatar">${firstName.charAt(0).toUpperCase()}</div>
+        </a>
+        <div class="notification-icon" id="notificationIcon" role="button" aria-label="Notifications" tabindex="0">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path d="M10 2C6.69 2 4 4.69 4 8v4.59l-1.71 1.7a1 1 0 00-.29.7v1a1 1 0 001 1h14a1 1 0 001-1v-1a1 1 0 00-.29-.7L16 12.59V8c0-3.31-2.69-6-6-6z" fill="currentColor"/>
           </svg>
-          <span class="notification-badge"></span>
+          <span class="notification-badge" id="notificationBadge"></span>
+        </div>
+        <div class="notification-panel" id="notificationPanel" aria-hidden="true">
+          <div class="notification-title">Notifications</div>
+          <div class="notification-list" id="notificationList"></div>
         </div>
       </div>
       <div class="search-bar">
@@ -65,6 +96,7 @@ router.get('/welcome', (req, res) => {
           <path d="m13 13 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
         <input type="text" placeholder="Search for food or restaurants" class="search-input" />
+        <button type="button" class="search-clear" aria-label="Clear search">×</button>
       </div>
     </header>
 
@@ -94,6 +126,14 @@ router.get('/welcome', (req, res) => {
 
     <!-- Main Content -->
     <main class="main-content">
+      <div class="sort-bar">
+        <div class="sort-label">Sort by</div>
+        <select id="sortSelect" class="sort-select">
+          <option value="distance">Nearest</option>
+          <option value="rating">Top rated</option>
+          <option value="name">Name (A–Z)</option>
+        </select>
+      </div>
       <!-- Grocery Deals Section -->
       <section class="deals-section">
         <div class="section-header">
@@ -175,6 +215,81 @@ router.get('/location', (req, res) => {
   res.sendFile(require('path').join(__dirname, '..', 'public', 'location.html'));
 });
 
+// Customer profile page (favorites + order summary)
+router.get('/profile', (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'customer') return res.redirect('/');
+  res.sendFile(require('path').join(__dirname, '..', 'public', 'profile.html'));
+});
+
+// Profile data (favorites + recent orders + weekly spend)
+router.get('/api/profile-data', async (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'customer') {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const userId = req.session.userId;
+    const userResult = await executeQuery('SELECT name, favorites FROM users WHERE id = ?', [userId]);
+    const favorites = userResult.success && userResult.data.length && userResult.data[0].favorites
+      ? JSON.parse(userResult.data[0].favorites)
+      : [];
+
+    const ordersResult = await executeQuery(
+      'SELECT id, price, created_at, status FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 5',
+      [userId]
+    );
+    const orders = ordersResult.success ? ordersResult.data : [];
+
+    const weeklyResult = await executeQuery(
+      'SELECT COALESCE(SUM(price),0) AS total FROM orders WHERE user_id = ? AND created_at >= (NOW() - INTERVAL 7 DAY)',
+      [userId]
+    );
+    const weeklySpend = weeklyResult.success && weeklyResult.data.length ? weeklyResult.data[0].total : 0;
+
+    res.json({
+      success: true,
+      name: userResult.success && userResult.data.length ? userResult.data[0].name : 'User',
+      favorites,
+      orders,
+      weeklySpend
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Vendor profile page (public view for customers)
+router.get('/vendor-profile', (req, res) => {
+  if (!req.session.userId) return res.redirect('/');
+  res.sendFile(require('path').join(__dirname, '..', 'public', 'vendor-profile.html'));
+});
+
+// Vendor profile data by business name
+router.get('/api/vendors/by-name', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const name = String(req.query.name || '').trim();
+  if (!name) return res.status(400).json({ success: false, error: 'Vendor name is required' });
+
+  try {
+    const vendorResult = await executeQuery(
+      'SELECT id, business_name, email, location, business_contact FROM vendors WHERE business_name = ? LIMIT 1',
+      [name]
+    );
+    if (!vendorResult.success || vendorResult.data.length === 0) {
+      return res.json({ success: false, error: 'Vendor not found' });
+    }
+
+    const vendor = vendorResult.data[0];
+    const productsResult = await executeQuery(
+      'SELECT id, name, description, price, discount, image_url, category FROM products WHERE vendor_id = ? ORDER BY created_at DESC',
+      [vendor.id]
+    );
+    const products = productsResult.success ? productsResult.data : [];
+    res.json({ success: true, vendor, products });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get user info (first name)
 router.get('/api/user-info', (req, res) => {
   if (!req.session.userId) {
@@ -183,6 +298,41 @@ router.get('/api/user-info', (req, res) => {
   const fullName = req.session.userName || 'Food lover';
   const firstName = String(fullName).split(' ')[0] || 'Food lover';
   res.json({ success: true, firstName });
+});
+
+// Profile summary for home bubble
+router.get('/api/profile-summary', async (req, res) => {
+  if (!req.session.userId || req.session.userType !== 'customer') {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const userResult = await executeQuery(
+      'SELECT id, name, street, city, zip, avatar_url FROM users WHERE id = ?',
+      [req.session.userId]
+    );
+    const user = userResult.success && userResult.data.length ? userResult.data[0] : null;
+
+    const ordersResult = await executeQuery(
+      'SELECT id, price, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 2',
+      [req.session.userId]
+    );
+    const orders = ordersResult.success ? ordersResult.data : [];
+
+    const totalResult = await executeQuery(
+      'SELECT COALESCE(SUM(price),0) AS total FROM orders WHERE user_id = ?',
+      [req.session.userId]
+    );
+    const totalSpend = totalResult.success && totalResult.data.length ? totalResult.data[0].total : 0;
+
+    res.json({
+      success: true,
+      user: user ? { name: user.name, street: user.street, city: user.city, zip: user.zip, avatar_url: user.avatar_url } : null,
+      orders: orders.map(o => ({ id: o.id, price: o.price, created_at: o.created_at })),
+      totalSpend
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Get user's favorites
@@ -517,11 +667,25 @@ router.get('/account', (req, res) => {
         </header>
         <main class="main-content" style="padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <div style="width: 80px; height: 80px; background: #4CAF50; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: bold;">
-              ${firstName.charAt(0).toUpperCase()}
+            <div style="width: 80px; height: 80px; background: #4CAF50; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: bold; overflow:hidden;">
+              <span id="profileAvatarInitial">${firstName.charAt(0).toUpperCase()}</span>
+              <img id="profileAvatarImage" alt="Profile" style="display:none;width:100%;height:100%;object-fit:cover;" />
             </div>
             <h2 style="margin: 0 0 8px 0; color: #333;">${fullName}</h2>
             <p style="color: #666; margin: 0;">${userType === 'customer' ? 'Customer' : 'Vendor'}</p>
+          </div>
+          <form action="/api/profile/avatar" method="POST" enctype="multipart/form-data" style="margin-bottom:16px;">
+            <label style="font-size:14px; color:#333; font-weight:600;">Profile photo</label>
+            <input type="file" name="avatar" accept="image/*" style="display:block; margin:8px 0 10px;" />
+            <button type="submit" class="logout-button" style="width: 100%; background:#4CAF50;">Upload Photo</button>
+          </form>
+          <div style="background:#fff; border:1px solid #e0e0e0; border-radius:12px; padding:16px; margin-bottom:16px;">
+            <h3 style="margin:0 0 10px; font-size:16px; color:#333;">Address</h3>
+            <p style="margin:0; color:#666;">House 17, Block A, Road 16, Banani</p>
+          </div>
+          <div style="background:#fff; border:1px solid #e0e0e0; border-radius:12px; padding:16px; margin-bottom:16px;">
+            <h3 style="margin:0 0 10px; font-size:16px; color:#333;">Payment Method</h3>
+            <p style="margin:0; color:#666;">Visa •••• 4242</p>
           </div>
           <form action="/logout" method="POST" style="margin-top: 40px;">
             <button type="submit" class="logout-button" style="width: 100%;">Logout</button>
@@ -555,9 +719,32 @@ router.get('/account', (req, res) => {
           </a>
         </nav>
       </div>
+      <script>
+        fetch('/api/profile-summary').then(r => r.json()).then(data => {
+          if (!data.success || !data.user || !data.user.avatar_url) return;
+          const img = document.getElementById('profileAvatarImage');
+          const initial = document.getElementById('profileAvatarInitial');
+          img.src = data.user.avatar_url;
+          img.style.display = 'block';
+          if (initial) initial.style.display = 'none';
+        });
+      </script>
     </body>
     </html>
   `);
+});
+
+// Upload avatar
+router.post('/api/profile/avatar', uploadAvatar.single('avatar'), async (req, res) => {
+  if (!req.session.userId) return res.status(401).send('Unauthorized');
+  if (!req.file) return res.status(400).send('No file uploaded');
+  const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+  try {
+    await executeQuery('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.session.userId]);
+    res.redirect('/account');
+  } catch (error) {
+    res.status(500).send('Failed to update avatar');
+  }
 });
 
 // Mystery Box page

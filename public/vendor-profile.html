@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grabrush - Vendor Profile</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    body { max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    .profile-container { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+    .profile-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .back-link { color:#4CAF50; text-decoration:none; font-weight:600; }
+    .vendor-card { background:#fff; border:1px solid #e0e0e0; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    .vendor-name { font-size:22px; font-weight:700; margin:0 0 6px; }
+    .vendor-meta { color:#666; font-size:14px; margin:0; }
+    .section-title { font-size:18px; font-weight:700; margin:24px 0 12px; }
+    .product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+    .product-card { border:1px solid #e0e0e0; border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+    .product-card img { width:100%; height:140px; object-fit:cover; display:block; background:#f5f5f5; }
+    .product-body { padding:12px; }
+    .product-name { font-weight:700; margin:0 0 6px; font-size:14px; }
+    .product-desc { color:#666; font-size:12px; margin:0 0 8px; }
+    .product-price { font-weight:700; color:#4CAF50; }
+    .profile-add-btn {
+      margin-top: 10px;
+      background: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .profile-add-btn:hover { background: #45a049; }
+    .empty-state { color:#666; text-align:center; padding:24px 0; }
+  </style>
+</head>
+<body>
+  <div class="profile-container">
+    <div class="profile-header">
+      <a class="back-link" href="/welcome">← Back to Home</a>
+    </div>
+
+    <div class="vendor-card">
+      <h1 class="vendor-name" id="vendorName">Vendor</h1>
+      <p class="vendor-meta" id="vendorLocation"></p>
+      <p class="vendor-meta" id="vendorContact"></p>
+    </div>
+
+    <div class="section-title">Available Items</div>
+    <div id="productsContainer" class="product-grid"></div>
+    <div id="emptyState" class="empty-state" style="display:none;">No items available for this vendor yet.</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const vendorName = (params.get('name') || 'Vendor').trim();
+    document.getElementById('vendorName').textContent = vendorName;
+
+    const productsContainer = document.getElementById('productsContainer');
+    const emptyState = document.getElementById('emptyState');
+    const vendorLocation = document.getElementById('vendorLocation');
+    const vendorContact = document.getElementById('vendorContact');
+
+    fetch(`/api/vendors/by-name?name=${encodeURIComponent(vendorName)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        const vendor = data.vendor || {};
+        vendorLocation.textContent = vendor.location ? `Location: ${vendor.location}` : '';
+        vendorContact.textContent = vendor.business_contact ? `Contact: ${vendor.business_contact}` : '';
+
+        const products = data.products || [];
+        if (!products.length) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        productsContainer.innerHTML = products.map(p => {
+          const image = p.image_url || 'https://via.placeholder.com/400x280?text=No+Image';
+          const desc = p.description ? p.description.slice(0, 80) : '';
+          const price = Number(p.price || 0).toFixed(2);
+          const discount = p.discount && Number(p.discount) > 0 ? ` (−$${Number(p.discount).toFixed(2)})` : '';
+          return `
+            <div class="product-card">
+              <img src="${image}" alt="${p.name || 'Item'}" loading="lazy">
+              <div class="product-body">
+                <p class="product-name">${p.name || 'Item'}</p>
+                <p class="product-desc">${desc}</p>
+                <div class="product-price">$${price}${discount}</div>
+                <button class="profile-add-btn" data-item="${p.name || 'Item'}" data-price="${p.price || 0}" data-image="${image}">Add to Cart</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        document.querySelectorAll('.profile-add-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const itemName = btn.getAttribute('data-item');
+            const price = btn.getAttribute('data-price');
+            const image = btn.getAttribute('data-image');
+            try {
+              const response = await fetch('/api/cart/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  restaurantName: vendorName,
+                  itemName,
+                  price: Number(price),
+                  quantity: 1,
+                  image,
+                  pickupTime: '8:30 PM - 9:30 PM'
+                })
+              });
+              const data = await response.json();
+              if (!data.success) {
+                console.error('Add to cart failed', data.error);
+              }
+            } catch (error) {
+              console.error('Add to cart error', error);
+            }
+          });
+        });
+      })
+      .catch(() => {
+        emptyState.style.display = 'block';
+      });
+  </script>
+</body>
+</html>
